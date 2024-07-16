@@ -1,0 +1,93 @@
+---
+title: "CD45+_analysis&subsetting"
+author: "Michael Gildea"
+date: "2024-03-06"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+```{r}
+time <- Sys.time()
+print(paste('This notebook was knit on:', time))
+print(version)
+```
+
+```{r}
+library(viridis)
+library(Seurat)
+library(ggplot2)
+library(CVRCFunc)
+library(SingleR)
+```
+
+# Read in data
+```{r}
+CD45_pos <- readRDS('CD45_pos.rds')
+```
+
+## singleR to map carotid labels to coronary
+This takes too long. Didn't run.
+```{r, fig.height=8, fig.width = 9, message=F, warning=F, eval = F}
+carotid <- readRDS('/gpfs/data/giannarellilab/Mike_G/Immune_checkpoint_inhibitors/Whole_dataset_annotated_human.rds')
+carotid <- as.SingleCellExperiment(carotid)
+
+ref.anno_carotid_major <- SingleR(test = CD45_pos[["RNA"]]@data, ref = carotid, labels = carotid$annotation_major, de.method="wilcox")
+re.anno.df <- as.data.frame(ref.anno_carotid_major)
+CD45_pos[["refference_carotid_major"]] <- ref.anno_carotid_major$pruned.labels
+
+save.image('CD45_pos_Workspace.RData')
+saveRDS(CD45_pos, file = 'CD45_pos.rds')
+```
+
+
+# Subset major immune populations
+```{r, fig.height=10, fig.width = 14}
+DimPlot(CD45_pos, label = T)
+DefaultAssay(CD45_pos) <- 'RNA'
+FeaturePlot(CD45_pos, features = c('PTPRC','CD3E', 'CD4', 'CD8A', 'CD68', 'CD19'))
+StackedVlnPlot(CD45_pos, features = c('PTPRC','CD3E', 'CD4', 'CD8A',"TRDC", "TRGC1", "TRGC2", "CCR7","CCR9", "SELL", 'NCAM1','CD68', 'CD19','CD79A', 'JCHAIN', 'MRC1', 'FCGR3A', 'CD14', 'HLA-DRB1', 'LYZ', 'CCR2', 'FSCN1'))
+```
+
+```{r}
+## T_cells
+Idents(CD45_pos) <- 'seurat_clusters'
+T_cells <- subset(CD45_pos, idents = c('0', '14', '1', '4', '5', '6', '7', '11', '8', '13', '12', '9'))
+DimPlot(T_cells, reduction = 'umap', label = T)
+
+CD4_cells <- WhichCells(T_cells, expression = CD4 > 0 & CD8A == 0 & CD8B == 0)
+CD4 <- subset(T_cells, cells=CD4_cells)
+saveRDS(CD4, file = 'subcluster/CD4.rds')
+
+CD8_cells <- WhichCells(T_cells, expression = CD4 == 0 & CD8A + CD8B > 0)
+CD8 <- subset(T_cells, cells=CD8_cells)
+saveRDS(CD8, file = 'subcluster/CD8.rds')
+
+dnT_cells <- WhichCells(T_cells, expression = CD4 == 0 & CD8A + CD8B == 0)
+dnT <- subset(T_cells, cells=dnT_cells)
+saveRDS(dnT, file = 'subcluster/dnT.rds')
+
+dpT_cells <- WhichCells(T_cells, expression = CD4 > 0 & CD8A + CD8B > 0)
+dpT <- subset(T_cells, cells=dpT_cells)
+saveRDS(dpT, file = 'subcluster/dpT.rds')
+
+## NK
+Idents(CD45_pos) <- 'seurat_clusters'
+NK_cells <- subset(CD45_pos, idents = c('3', '18'))
+DimPlot(NK_cells, reduction = 'umap', label = T)
+saveRDS(NK_cells, file = 'subcluster/NK.rds')
+
+## B
+Idents(CD45_pos) <- 'seurat_clusters'
+B_cells <- subset(CD45_pos, idents = c('10', '21'))
+DimPlot(B_cells, reduction = 'umap', label = T)
+saveRDS(B_cells, file = 'subcluster/B.rds')
+
+## Myeloid
+Idents(CD45_pos) <- 'seurat_clusters'
+myeloid_cells <- subset(CD45_pos, idents = c('2', '16', '20', '22', '15', '17'))
+DimPlot(myeloid_cells, reduction = 'umap', label = T)
+saveRDS(myeloid_cells, file = 'subcluster/Myeloid.rds')
+```

@@ -1,0 +1,75 @@
+---
+title: "T cells WNN subclustering"
+author: "Michael Gildea"
+date: "7/21/2023"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(CVRCFunc)
+library(SeuratDisk)
+library(pheatmap)
+use_miniconda(condaenv = "/gpfs/data/fisherlab/conda_envs/scVelo")
+integrated_wnn <- readRDS(file = '/gpfs/data/giannarellilab/Mike_G/Immune_checkpoint_inhibitors/PBMC_ICI_CITEseq/CTLA4_PD1_treated/integrated_wnn_majoranno.rds')
+```
+
+# Extract T cells
+```{r}
+Idents(integrated_wnn) <- 'annotation_major'
+T_cells <- subset(integrated_wnn, idents = 'T')
+```
+
+# Sub cluster using RNA and protein data with WNN
+```{r}
+Idents(T_cells) <- 'orig.ident'
+T_cells_4h <- subset(T_cells, idents = '4h')
+T_cells_4h <- SCTransform(T_cells_4h,  vst.flavor = "v2", return.only.var.genes = F)
+T_cells_24h <- subset(T_cells, idents = '24h')
+T_cells_24h <- SCTransform(T_cells_24h,  vst.flavor = "v2", return.only.var.genes = F)
+T_cells_list <- list(hour_4 = T_cells_4h, hour_24 = T_cells_24h)
+features <- SelectIntegrationFeatures(object.list = T_cells_list, nfeatures = 3000)
+rm(T_cells_24h, T_cells_4h, T_cells_list)
+T_cells <- RunPCA(T_cells, features = features, assay = 'integrated', reduction.name = 'pca')
+ElbowPlot(T_cells, reduction = 'pca')
+T_cells <- FindMultiModalNeighbors(T_cells, reduction.list = list("pca", "pca.adt"),  dims.list = list(1:15, 1:10), modality.weight.name = "RNA.weight")
+T_cells <- RunUMAP(T_cells, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+T_cells <- FindClusters(T_cells, graph.name = "wsnn", algorithm = 4, verbose = FALSE)
+T_cells <- NormalizeData(T_cells, assay = 'RNA')
+```
+
+```{r}
+DimPlot(T_cells)
+DefaultAssay(T_cells) <- 'ADT'
+row.names(T_cells@assays$ADT@data)[89] <- 'Hu.CD4'
+row.names(T_cells@assays$ADT@scale.data)[89] <- 'Hu.CD4'
+row.names(T_cells@assays$ADT@counts)[89] <- 'Hu.CD4'
+StackedVlnPlot(T_cells, features = c('Hu.CD8', 'Hu.CD4'), clus_ident = 'seurat_clusters', assay = 'ADT', slot = 'data')
+qplot(T_cells@assays$ADT@data[89,], T_cells@assays$ADT@data[106,])+ylab('CD8 - protein')+xlab('CD4 - protein')+geom_hline(yintercept = 0.4, color = 'red')+geom_vline(xintercept = 0.35, color = 'red')+ geom_rug(col=rgb(.5,0,0,alpha=.2))
+
+length(which(T_cells@assays$ADT@data[106,which(T_cells@assays$ADT@data[89,] > .35)] > .4)) # double positive
+length(which(T_cells@assays$ADT@data[106,which(T_cells@assays$ADT@data[89,] < .35)] > 0.4 )) # CD8
+length(which(T_cells@assays$ADT@data[89,which(T_cells@assays$ADT@data[106,] < .4)] > .35)) # CD4
+length(which(T_cells@assays$ADT@data[89,which(T_cells@assays$ADT@data[106,] < .4)] < .35)) # double negative
+
+dp <- WhichCells(T_cells, expression = Hu.CD8 > 0.4 & Hu.CD4 > 0.35, slot = 'data')
+CD8 <- WhichCells(T_cells, expression = Hu.CD8 > 0.4 & Hu.CD4 < 0.35, slot = 'data')
+CD4 <- WhichCells(T_cells, expression = Hu.CD8 < 0.4 & Hu.CD4 > 0.35, slot = 'data')
+dn <- WhichCells(T_cells, expression = Hu.CD8 < 0.4 & Hu.CD4 < 0.35, slot = 'data')
+dp <- subset(T_cells, cells = dp)
+CD8 <- subset(T_cells, cells = CD8)
+CD4 <- subset(T_cells, cells = CD4)
+dn <- subset(T_cells, cells = dn)
+saveRDS(dp, file = 'T_dp.rds')
+saveRDS(dn, file = 'T_dn.rds')
+saveRDS(CD4, file = 'T_CD4.rds')
+saveRDS(CD8, file = 'T_CD8.rds')
+
+```

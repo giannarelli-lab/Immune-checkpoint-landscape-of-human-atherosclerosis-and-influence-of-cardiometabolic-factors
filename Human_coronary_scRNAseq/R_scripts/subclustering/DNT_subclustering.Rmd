@@ -1,0 +1,24 @@
+---
+title: "DNT_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+DNT <- readRDS('DNT.rds')
+DefaultAssay(DNT) <- "integrated"
+DNT <- ScaleData(DNT, assay = 'integrated')
+DNT <- RunPCA(DNT, verbose = FALSE, npcs = 30)
+DNT <- RunUMAP(DNT, dims = 1:30, verbose = TRUE)
+DNT <- FindNeighbors(DNT, verbose = TRUE, dims = 1:30)
+DNT <- FindClusters(DNT, verbose = TRUE, resolution = .75)
+saveRDS(DNT, file = 'DNT_clustered.rds')
+```

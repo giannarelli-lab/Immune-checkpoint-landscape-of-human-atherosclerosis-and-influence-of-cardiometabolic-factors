@@ -1,0 +1,28 @@
+---
+title: "Myeloid_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+myeloid <- readRDS('Myeloid.rds')
+DefaultAssay(myeloid) <- "integrated"
+myeloid <- ScaleData(myeloid, assay = 'integrated')
+myeloid <- RunPCA(myeloid, verbose = FALSE, npcs = 30)
+myeloid <- RunUMAP(myeloid, dims = 1:30, verbose = TRUE)
+myeloid <- FindNeighbors(myeloid, verbose = TRUE, dims = 1:30)
+myeloid <- FindClusters(myeloid, verbose = TRUE, resolution = .75)
+saveRDS(myeloid, file = 'Myeloid_clustered.rds')
+```
+
+```{r, eval = F}
+FindMarkersBulk(myeloid, clus_ident = 'seurat_clusters', sample_ident = 'Sample', out_dir = 'Myeloid_subcluster_markers')
+```

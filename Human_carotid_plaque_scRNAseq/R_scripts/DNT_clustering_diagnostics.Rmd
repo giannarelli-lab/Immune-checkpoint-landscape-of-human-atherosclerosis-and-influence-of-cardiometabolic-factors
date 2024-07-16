@@ -1,0 +1,102 @@
+---
+title: "DNT_clustering_diagnostics"
+author: "Michael Gildea"
+date: "2024-03-20"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(pheatmap)
+library(stringr)
+library(RColorBrewer)
+library(gridExtra)
+library(cluster)
+library(bluster)
+library(SingleCellExperiment)
+```
+
+```{r}
+Whole_dataset_annotated_human.rds <- readRDS(file = 'Whole_dataset_annotated_human.rds')
+```
+
+```{r}
+Idents(Whole_dataset_annotated_human.rds) <- 'annotation_major'
+T_cells <- subset(Whole_dataset_annotated_human.rds, idents = c('CD8 T cell' , 'DN T cell' , 'CD4 T cell',  'DP T cell'))
+rm(Whole_dataset_annotated_human.rds)
+```
+
+## silhouette scores
+
+```{r, message=FALSE, warning=FALSE, fig.width=18, fig.height=10}
+T_cells <- RunPCA(T_cells, assay = 'integrated')
+T_cells_sce <- as.SingleCellExperiment(T_cells)
+dist.matrix <- dist(x = Embeddings(object = T_cells[['pca']])[, c(1:30)])
+silhouette_scores <- data.frame(row.names = colnames(T_cells))
+
+sil.approx <- approxSilhouette(reducedDim(T_cells_sce, "PCA"), clusters=T_cells_sce$annotation_fine)
+sil.data <- as.data.frame(sil.approx)
+sil.data$closest <- factor(ifelse(sil.data$width > 0, T_cells_sce$annotation_fine, sil.data$other))
+sil.data$cluster <- T_cells_sce$annotation_fine
+
+library(ggplot2)
+ggplot(sil.data, aes(x=cluster, y=width, colour=closest)) +
+    ggbeeswarm::geom_quasirandom(method="smiley")
+
+ggplot(sil.data, aes(y = width, x = cluster, color = closest))+
+  ggbeeswarm::geom_quasirandom()+
+  geom_boxplot(alpha = 0.5, color = 'black', outlier.shape = NA)+
+  theme_bw()+
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())+
+  ylab('Silhouette scores')
+
+sil.data_sub <- sil.data[which(sil.data$cluster %in% c('CCR7+ Naïve Other T cell' , 'IL2RA+ Reg Other T cell', 'KLRB1+ MAIT Other T cell' ,'LGALS1+ NKT Other T cell', 'NELL2+ MAIT Other T cell')),]
+
+ggplot(sil.data_sub, aes(y = width, x = cluster, color = closest))+
+  ggbeeswarm::geom_quasirandom()+
+  geom_boxplot(alpha = 0.5, color = 'black', outlier.shape = NA)+
+  theme_bw()+
+  ylab('Silhouette scores')+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0, vjust = 1), axis.title.x = element_blank())
+```
+
+```{r, fig.height=8, fig.width=20}
+pheatmap(table(sil.data$cluster, sil.data$closest), cluster_rows = F, cluster_cols = F, display_numbers = T,  color=colorRampPalette(c("white", "red"))(100), main = 'Closest neighboring cells', number_format = "%.0f")
+
+pheatmap(table(sil.data_sub$cluster, sil.data_sub$closest), cluster_rows = T, cluster_cols = T, display_numbers = T,  color=colorRampPalette(c("white", "red"))(100), main = 'Closest neighboring cells', number_format = "%.0f")
+```
+
+## Cluster purity
+
+```{r, fig.height=7, fig.width=18}
+purity <- neighborPurity(T_cells@reductions$pca@cell.embeddings, T_cells$annotation_fine)
+pure.data <- as.data.frame(purity)
+pure.data$maximum <- factor(pure.data$maximum)
+pure.data$cluster <- T_cells$annotation_fine
+pure.data.sub <- pure.data[which(pure.data$cluster %in% c('CCR7+ Naïve Other T cell' , 'IL2RA+ Reg Other T cell', 'KLRB1+ MAIT Other T cell' ,'LGALS1+ NKT Other T cell', 'NELL2+ MAIT Other T cell')),]
+ggplot(pure.data.sub, aes(x=cluster, y=purity, colour=maximum)) +
+  ggbeeswarm::geom_quasirandom(method="smiley")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0, vjust = 1), axis.title.x = element_blank())
+
+pdf('figures/cluster_purity.pdf', width = 12, height = 4)
+pheatmap(table(pure.data.sub$cluster, pure.data.sub$maximum), cluster_rows = F, cluster_cols = F, display_numbers = T,  color=colorRampPalette(c("white", "red"))(100), main = ' Closest neighboring cells', number_format = "%.0f")
+dev.off()
+```
+
+## Modularity
+```{r, fig.height=18, fig.width=18, message=FALSE, warning=FALSE}
+T_cells <- FindNeighbors(T_cells, reduction = 'pca', assay = 'integrated')
+mod <- pairwiseModularity(igraph::graph_from_adjacency_matrix(T_cells@graphs$integrated_nn), T_cells$annotation_fine, as.ratio = TRUE)
+mod_sub <- mod[which(row.names(mod) %in% c('CCR7+ Naïve Other T cell' , 'IL2RA+ Reg Other T cell', 'KLRB1+ MAIT Other T cell' ,'LGALS1+ NKT Other T cell', 'NELL2+ MAIT Other T cell')),]
+
+pdf('figures/Pairwise_modularity_matrix.pdf')
+pheatmap(log10(mod+1), cluster_rows = F, cluster_cols = F, color=colorRampPalette(c("white", "red"))(100), display_numbers = F, main = 'Pairwise cluster modularity', border_color = NA)
+dev.off()
+```
+

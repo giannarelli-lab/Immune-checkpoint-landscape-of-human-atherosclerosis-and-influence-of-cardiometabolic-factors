@@ -1,0 +1,307 @@
+---
+title: "Pre_process_integrate"
+author: "Michael Gildea"
+date: "2024-03-01"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r}
+time <- Sys.time()
+print(paste('This notebook was knit on:', time))
+print(version)
+```
+
+
+```{r, message=F, warning=F}
+library(viridis)
+library(Seurat)
+library(ggplot2)
+library(CVRCFunc)
+library(SingleR)
+library(reshape2)
+library(stringr)
+```
+
+
+```{r, fig.height=4, fig.width=16, message=F, warning=F}
+LAD_scRNAseq_1 <- readRDS(file = 'LAD_scRNAseq_1.rds')
+LAD_scRNAseq_2 <- readRDS(file = 'SLAD_scRNAseq_2.rds')
+LAD_scRNAseq_3 <- readRDS(file = 'SLAD_scRNAseq_3.rds')
+LAD_scRNAseq_4 <- readRDS(file = 'LAD_scRNAseq_4.rds')
+LAD_scRNAseq_5 <- readRDS(file = 'LAD_scRNAseq_5.rds')
+LAD_scRNAseq_6 <- readRDS(file = 'LAD_scRNAseq_6.rds')
+```
+
+## Joint QC plots
+```{r, message=F, warning=F}
+seurat_merged <- merge(LAD_scRNAseq_1, y = list(LAD_scRNAseq_2 = LAD_scRNAseq_2, LAD_scRNAseq_3 = LAD_scRNAseq_3, LAD_scRNAseq_4 = LAD_scRNAseq_4, LAD_scRNAseq_5 = LAD_scRNAseq_5, LAD_scRNAseq_6 = LAD_scRNAseq_6), add.cell.ids = c('LAD_scRNAseq_1', 'LAD_scRNAseq_2', 'LAD_scRNAseq_3', 'LAD_scRNAseq_4', 'LAD_scRNAseq_5', 'LAD_scRNAseq_6'), project = 'Coronary_ICI')
+a <- ggplot(seurat_merged@meta.data, aes(y = log10(nCount_RNA), x = Sample, fill = Sample))+
+  geom_violin()+
+  theme_classic()+
+  scale_fill_viridis_d()+
+  theme(legend.position = 'none', axis.text.x = element_text(angle = -315, hjust = 1, vjust = 1), axis.title.x = element_blank())
+b <- ggplot(seurat_merged@meta.data, aes(y = log10(nFeature_RNA), x = Sample, fill = Sample))+
+  geom_violin()+
+  theme_classic()+
+  scale_fill_viridis_d()+
+  theme(legend.position = 'none', axis.text.x = element_text(angle = -315, hjust = 1, vjust = 1), axis.title.x = element_blank())
+c <- ggplot(seurat_merged@meta.data, aes(y = log10(percent.mt), x = Sample, fill = Sample))+
+  geom_violin()+
+  theme_classic()+
+  scale_fill_viridis_d()+
+  theme(legend.position = 'none', axis.text.x = element_text(angle = -315, hjust = 1, vjust = 1), axis.title.x = element_blank())
+a+b+c
+```
+
+
+# Un-integrated clustering
+```{r, eval = T, fig.height=8, fig.width=10, message=F, warning=F}
+seurat_merged <- NormalizeData(seurat_merged, assay = 'RNA')
+seurat_merged <- FindVariableFeatures(seurat_merged, assay = 'RNA')
+seurat_merged <- ScaleData(seurat_merged, assay = 'RNA')
+seurat_merged <- RunPCA(seurat_merged, assay = 'RNA')
+seurat_merged <- FindNeighbors(seurat_merged, assay = 'RNA')
+seurat_merged <- FindClusters(seurat_merged)
+seurat_merged <- RunUMAP(seurat_merged, dims = c(1:30), reduction = 'pca')
+
+top10 <- head(VariableFeatures(seurat_merged), 30)
+plot1 <- VariableFeaturePlot(seurat_merged)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot2
+
+DimPlot(seurat_merged, label = T)
+seurat_merged$nCount_RNA_log <- log10(seurat_merged$nCount_RNA)
+FeaturePlot(seurat_merged, features = 'nCount_RNA_log')
+seurat_merged$nFeature_RNA_log <- log10(seurat_merged$nFeature_RNA)
+FeaturePlot(seurat_merged, features = 'nFeature_RNA_log')
+StackedVlnPlot(seurat_merged, features = c('nCount_RNA_log', 'nFeature_RNA_log', 'percent.mt'))
+FeaturePlot(seurat_merged, features = c('PTPRC','CD3E', 'CD4', 'CD8A', 'CD68', 'CD19'))
+StackedVlnPlot(seurat_merged, features = c('PTPRC','CD3E', 'CD4', 'CD8A', 'CD68', 'CD19', 'MYH11', 'COL1A1', 'ACTA2', 'PECAM1', 'CDH5', 'MYH10', 'DCN', 'LUM', 'PLP1', 'CD34', 'MRC1', 'CD14', 'HLA-DRB1', 'LYZ', 'CCR2'))
+```
+
+## Dimmensionality reduction plots
+there are clearly clusters specific to certain samples and it seems to correlate with UMI counts
+```{r, fig.height=8, fig.width=10, message=F, warning=F}
+Idents(seurat_merged) <- 'Sample'
+DimPlot(seurat_merged, reduction = 'pca')
+Idents(seurat_merged) <- 'Sample'
+DimPlot(seurat_merged)
+DimPlot(seurat_merged, split.by = 'Sample', ncol = 3)
+```
+
+```{r, fig.width = 14, fig.height=6, message=F, warning=F}
+prop_table <- as.data.frame(prop.table(table(seurat_merged$Sample, seurat_merged$seurat_clusters), margin = 1))
+ggplot(prop_table, aes(y = Freq, x = Var2, color = Var1))+geom_point()+theme_classic()
+ggplot(prop_table, aes(y = Freq, x = Var2, fill = Var1))+geom_bar(stat = 'identity', position = 'dodge')+theme_classic()
+```
+
+# Integrate
+```{r, eval = F}
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+final_obj_list <- list(LAD_scRNAseq_1 = LAD_scRNAseq_1, LAD_scRNAseq_2 = LAD_scRNAseq_2, LAD_scRNAseq_3 = LAD_scRNAseq_3, LAD_scRNAseq_4 = LAD_scRNAseq_4, LAD_scRNAseq_5 = LAD_scRNAseq_5, LAD_scRNAseq_6 = LAD_scRNAseq_6)
+final_obj_list <- lapply(X = final_obj_list, FUN = function(x) {
+  x <- SCTransform(x, assay = 'RNA', new.assay.name = 'SCT',variable.features.n = 3000)
+  x <- CellCycleScoring(x, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE,assay='SCT')
+  x <- SCTransform(x, assay = 'RNA', new.assay.name = 'SCT', vars.to.regress = c("S.Score", "G2M.Score"),variable.features.n = 3000)
+})
+features <- SelectIntegrationFeatures(final_obj_list, nfeatures = 3000)
+final_obj_list <- PrepSCTIntegration(final_obj_list, anchor.features = features)
+final_obj_list <- lapply(X = final_obj_list, FUN = function(x) {
+  x <- RunPCA(x, features = features, verbose = FALSE)
+})
+anchors  <- FindIntegrationAnchors(final_obj_list, normalization.method = "SCT", anchor.features = features, dims = 1:30, reduction = "rpca")
+integrated <- IntegrateData(anchorset = anchors, normalization.method = "SCT",dims = 1:30)
+
+
+integrated <- RunPCA(integrated, verbose = FALSE, npcs = 30)
+integrated <- RunUMAP(integrated, dims = 1:30, verbose = TRUE)
+integrated <- FindNeighbors(integrated, verbose = TRUE, dims = 1:30)
+integrated <- FindClusters(integrated, verbose = TRUE)
+saveRDS(integrated, file = 'integrated.rds')
+```
+
+
+## singleR to map carotid labels to coronary
+This takes too long. Didn't run.
+```{r, fig.height=8, fig.width = 9, message=F, warning=F, eval = F}
+
+carotid <- readRDS('/gpfs/data/giannarellilab/Mike_G/Immune_checkpoint_inhibitors/Whole_dataset_annotated_human.rds')
+carotid <- as.SingleCellExperiment(carotid)
+ref.anno_carotid_fine <- SingleR(test = integrated[["RNA"]]@data, ref = carotid, labels = carotid$annotation_fine, de.method="wilcox")
+re.anno.df <- as.data.frame(ref.anno_carotid_fine)
+integrated[["refference_carotid_fine"]] <- ref.anno_carotid_fine$pruned.labels
+
+
+save.image('Integration_Workspace.RData')
+saveRDS(integrated, file = 'integrated.rds')
+
+ref.anno_carotid_major <- SingleR(test = integrated[["RNA"]]@data, ref = carotid, labels = carotid$annotation_major, de.method="wilcox")
+re.anno.df <- as.data.frame(ref.anno_carotid_major)
+integrated[["refference_carotid_major"]] <- ref.anno_carotid_major$pruned.labels
+
+save.image('Integration_Workspace.RData')
+saveRDS(integrated, file = 'integrated.rds')
+```
+
+
+## Dimmensionality reduction plots
+there are clearly clusters specific to certain samples and it seems to correlate with UMI counts
+```{r, fig.height=8, fig.width=10, message=F, warning=F}
+integrated <- readRDS('integrated.rds')
+Idents(integrated) <- 'seurat_clusters'
+DimPlot(integrated, raster = F, label = T)
+Idents(integrated) <- 'Sample'
+DimPlot(integrated, reduction = 'pca')
+Idents(integrated) <- 'Sample'
+DimPlot(integrated)
+DimPlot(integrated, split.by = 'Sample', ncol = 3)
+```
+
+```{r, fig.width = 14, fig.height=6, message=F, warning=F}
+prop_table <- as.data.frame(prop.table(table(integrated$Sample, integrated$seurat_clusters), margin = 1))
+ggplot(prop_table, aes(y = Freq, x = Var2, color = Var1))+geom_point()+theme_classic()
+ggplot(prop_table, aes(y = Freq, x = Var2, fill = Var1))+geom_bar(stat = 'identity', position = 'dodge')+theme_classic()
+```
+
+## Doublets?
+Previously marked with scDBLfinder
+```{r}
+print(table(integrated$seurat_clusters, integrated$doublet_class))
+Idents(integrated) <- 'doublet_class'
+DimPlot(integrated)+scale_color_manual(values = c('grey','red'))
+FeaturePlot(integrated, features = 'doublet_score')
+Idents(integrated) <- 'seurat_clusters'
+VlnPlot(integrated, features = 'doublet_score')+NoLegend()
+prop.doublets <- melt(prop.table(table(integrated$seurat_clusters, integrated$doublet_class),margin = 1))
+ggplot(prop.doublets, aes(x = Var1, y = value, fill = Var2))+
+  geom_bar(stat = 'identity')+
+  theme_classic()+
+  xlab('Cluster number')+
+  ylab('fraction doublet class')
+```
+
+# Remove doublets and re-integrate
+```{r, eval = F}
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+Idents(LAD_scRNAseq_1) <- 'doublet_class'
+LAD_scRNAseq_1 <- subset(LAD_scRNAseq_1, idents = 'singlet')
+Idents(LAD_scRNAseq_2) <- 'doublet_class'
+LAD_scRNAseq_2 <- subset(LAD_scRNAseq_2, idents = 'singlet')
+Idents(LAD_scRNAseq_3) <- 'doublet_class'
+LAD_scRNAseq_3 <- subset(LAD_scRNAseq_3, idents = 'singlet')
+Idents(LAD_scRNAseq_4) <- 'doublet_class'
+LAD_scRNAseq_4 <- subset(LAD_scRNAseq_4, idents = 'singlet')
+Idents(LAD_scRNAseq_5) <- 'doublet_class'
+LAD_scRNAseq_5 <- subset(LAD_scRNAseq_5, idents = 'singlet')
+Idents(LAD_scRNAseq_6) <- 'doublet_class'
+LAD_scRNAseq_6 <- subset(LAD_scRNAseq_6, idents = 'singlet')
+
+
+final_obj_list <- list(LAD_scRNAseq_1 = LAD_scRNAseq_1, LAD_scRNAseq_2 = LAD_scRNAseq_2, LAD_scRNAseq_3 = LAD_scRNAseq_3, LAD_scRNAseq_4 = LAD_scRNAseq_4, LAD_scRNAseq_5 = LAD_scRNAseq_5, LAD_scRNAseq_6 = LAD_scRNAseq_6)
+final_obj_list <- lapply(X = final_obj_list, FUN = function(x) {
+  x <- SCTransform(x, assay = 'RNA', new.assay.name = 'SCT',variable.features.n = 3000)
+  x <- CellCycleScoring(x, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE,assay='SCT')
+  x <- SCTransform(x, assay = 'RNA', new.assay.name = 'SCT', vars.to.regress = c("S.Score", "G2M.Score"),variable.features.n = 3000)
+})
+features <- SelectIntegrationFeatures(final_obj_list, nfeatures = 3000)
+final_obj_list <- PrepSCTIntegration(final_obj_list, anchor.features = features)
+final_obj_list <- lapply(X = final_obj_list, FUN = function(x) {
+  x <- RunPCA(x, features = features, verbose = FALSE)
+})
+anchors  <- FindIntegrationAnchors(final_obj_list, normalization.method = "SCT", anchor.features = features, dims = 1:30, reduction = "rpca")
+integrated_dedup <- IntegrateData(anchorset = anchors, normalization.method = "SCT",dims = 1:30)
+
+
+integrated_dedup <- RunPCA(integrated_dedup, verbose = FALSE, npcs = 30)
+integrated_dedup <- RunUMAP(integrated_dedup, dims = 1:30, verbose = TRUE)
+integrated_dedup <- FindNeighbors(integrated_dedup, verbose = TRUE, dims = 1:30)
+integrated_dedup <- FindClusters(integrated_dedup, verbose = TRUE)
+saveRDS(integrated_dedup, file = 'integrated_dedup.rds')
+```
+
+## Find cluster markers
+```{r, eval = F}
+FindMarkersBulk(integrated_dedup, clus_ident = 'seurat_clusters', sample_ident = 'Sample', out_dir = 'FindMarkersBulk_wholedataset_clustering')
+```
+
+
+## Dimmensionality reduction plots
+there are clearly clusters specific to certain samples and it seems to correlate with UMI counts
+```{r, fig.height=8, fig.width=10, message=F, warning=F}
+integrated_dedup <- readRDS('integrated_dedup.rds')
+Idents(integrated_dedup) <- 'seurat_clusters'
+DimPlot(integrated_dedup, raster = F, label = T)
+Idents(integrated_dedup) <- 'Sample'
+DimPlot(integrated_dedup, reduction = 'pca')
+Idents(integrated_dedup) <- 'Sample'
+DimPlot(integrated_dedup)
+DimPlot(integrated_dedup, split.by = 'Sample', ncol = 3)
+```
+
+```{r, fig.width = 14, fig.height=6, message=F, warning=F}
+prop_table <- as.data.frame(prop.table(table(integrated_dedup$Sample, integrated_dedup$seurat_clusters), margin = 1))
+ggplot(prop_table, aes(y = Freq, x = Var2, color = Var1))+geom_point()+theme_classic()
+ggplot(prop_table, aes(y = Freq, x = Var2, fill = Var1))+geom_bar(stat = 'identity', position = 'dodge')+theme_classic()
+```
+
+## Top marker heatmap
+```{r, fig.height=70, fig.width=8, message=F, warning=F}
+markers <- read.csv('FindMarkersBulk_wholedataset_clustering/Top_markers.csv')
+avg_exp <- AverageExpression(integrated_dedup, features = unique(markers$x), assay = 'RNA', slot = 'data', group.by = 'seurat_clusters')
+paletteLength <- 50
+myColor <- colorRampPalette(c("blue", "white", "red"))(paletteLength)
+myBreaks <- c(seq(-3, 0, length.out=ceiling(paletteLength/2) + 1), 
+              seq(3/paletteLength, 3, length.out=floor(paletteLength/2)))
+pheatmap::pheatmap(avg_exp$RNA, scale = 'row', color = myColor, breaks =myBreaks, fontsize = 5)
+```
+
+## Annotate CD45- cells and include very major annotation (CD45+/CD45-)
+```{r, fig.height=10, fig.width=12}
+Idents(integrated_dedup) <- 'seurat_clusters'
+DimPlot(integrated_dedup, label = T)
+DefaultAssay(integrated_dedup) <- 'RNA'
+FeaturePlot(integrated_dedup, features = c('PTPRC','CD3E', 'CD4', 'CD8A', 'CD68', 'CD19'))
+StackedVlnPlot(integrated_dedup, features = c('PTPRC','CD3E', 'CD4', 'CD8A', 'CD68', 'CD19', 'MYH11', 'COL1A1', 'ACTA2', 'PECAM1', 'CDH5', 'MYH10', 'DCN', 'LUM', 'PLP1', 'CD34', 'MRC1', 'CD14', 'HLA-DRB1', 'LYZ', 'CCR2'))
+annotation_major <- as.vector(integrated_dedup$seurat_clusters)
+annotation_major[which(annotation_major %in% c('0','6','7','13','20','21','22','24'))] <- 'CD45-'
+annotation_major[which(annotation_major != 'CD45-')] <- 'CD45+'
+integrated_dedup$annotation_major <- annotation_major
+Idents(integrated_dedup) <- 'annotation_major'
+DimPlot(integrated_dedup)
+annotation_mid <- as.vector(integrated_dedup$seurat_clusters)
+annotation_mid[which(annotation_mid %in% c('13','22'))] <- 'Smooth muscle'
+annotation_mid[which(annotation_mid %in% c('0','6','21','24'))] <- 'Endothelial'
+annotation_mid[which(annotation_mid %in% c('7'))] <- 'Fibroblasts'
+annotation_mid[which(annotation_mid %in% c('20'))] <- 'Myofibroblasts'
+integrated_dedup$annotation_mid <- annotation_mid
+Idents(integrated_dedup) <- 'annotation_mid'
+DimPlot(integrated_dedup, label  = T)
+#saveRDS(integrated_dedup, file = 'integrated_dedup.rds')
+```
+
+# Subset CD45+/CD45-
+```{r, eval = F}
+Idents(integrated_dedup) <- 'annotation_major'
+CD45_pos <- subset(integrated_dedup, idents = 'CD45+')
+DefaultAssay(CD45_pos) <- 'integrated'
+CD45_pos <- ScaleData(CD45_pos, assay = 'integrated')
+CD45_pos <- RunPCA(CD45_pos, verbose = FALSE, npcs = 30)
+CD45_pos <- RunUMAP(CD45_pos, dims = 1:30, verbose = TRUE)
+CD45_pos <- FindNeighbors(CD45_pos, verbose = TRUE, dims = 1:30)
+CD45_pos <- FindClusters(CD45_pos, verbose = TRUE)
+saveRDS(CD45_pos, file = 'CD45_pos.rds')
+FindMarkersBulk(CD45_pos, clus_ident = 'seurat_clusters', sample_ident = 'Sample', out_dir = 'FindMarkersBulk_CD45pos_clustering')
+```
+
+```{r}
+FindMarkersBulk(integrated_dedup, clus_ident = 'annotation_fine', sample_ident = 'Sample', out_dir = 'FindMarkersBulk_wholedataset_annotation_fine')
+```

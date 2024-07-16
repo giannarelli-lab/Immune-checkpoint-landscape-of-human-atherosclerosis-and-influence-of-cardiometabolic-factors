@@ -1,0 +1,35 @@
+---
+title: "B_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+B <- readRDS('../../B_updated.rds')
+DefaultAssay(B) <- "integrated"
+B <- ScaleData(B, assay = 'integrated')
+B <- RunPCA(B, verbose = FALSE, npcs = 30)
+B <- RunUMAP(B, dims = 1:30, verbose = TRUE)
+B <- FindNeighbors(B, verbose = TRUE, dims = 1:30)
+B <- FindClusters(B, verbose = TRUE, resolution = .75)
+saveRDS(B, file = 'B_clustered')
+```
+
+
+```{r, eval = F}
+#Export H5ad for celltypist
+SaveH5Seurat(B, filename = "B.h5Seurat")
+Convert("B.h5Seurat", dest = "B_RNA.h5ad", assay = 'RNA')
+Convert("B.h5Seurat", dest = "B_integrated.h5ad", assay = 'integrated')
+FindMarkersBulk(B, clus_ident = 'seurat_clusters', sample_ident = 'orig.ident')
+```
+
+

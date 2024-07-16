@@ -1,0 +1,99 @@
+---
+title: "T_CD4_wnn_subcluster"
+author: "Michael Gildea"
+date: "7/21/2023"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(CVRCFunc)
+library(SeuratDisk)
+library(pheatmap)
+library(gridExtra)
+library(kableExtra)
+library(scater)
+library(patchwork)
+library(viridis)
+library(dplyr)
+use_miniconda(condaenv = "/gpfs/data/fisherlab/conda_envs/scVelo")
+print('This notebook was generated on: ')
+print(Sys.time())
+```
+
+```{r}
+load(file = 'T_CD4_workspace.RData')
+```
+
+# Sub cluster using RNA and protein data with WNN
+```{r, eval = F}
+CD4 <- readRDS('T_CD4.rds')
+Idents(CD4) <- 'orig.ident'
+CD4_4h <- subset(CD4, idents = '4h')
+CD4_4h <- SCTransform(CD4_4h,  vst.flavor = "v2", return.only.var.genes = F)
+CD4_24h <- subset(CD4, idents = '24h')
+CD4_24h <- SCTransform(CD4_24h,  vst.flavor = "v2", return.only.var.genes = F)
+CD4_list <- list(hour_4 = CD4_4h, hour_24 = CD4_24h)
+features <- SelectIntegrationFeatures(object.list = CD4_list, nfeatures = 3000)
+rm(CD4_24h, CD4_4h, CD4_list)
+CD4 <- RunPCA(CD4, features = features, assay = 'integrated', reduction.name = 'pca')
+ElbowPlot(CD4, reduction = 'pca')
+CD4 <- FindMultiModalNeighbors(CD4, reduction.list = list("pca", "pca.adt"),  dims.list = list(1:15, 1:10), modality.weight.name = "RNA.weight")
+CD4 <- RunUMAP(CD4, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+CD4 <- FindClusters(CD4, graph.name = "wsnn", algorithm = 4, verbose = FALSE, resolution = .9)
+CD4 <- NormalizeData(CD4, assay = 'RNA')
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+DefaultAssay(CD4) <- 'RNA'
+CD4 <- CellCycleScoring(CD4, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+save.image('T_CD4_workspace.RData')
+```
+
+# Find cluster markers 
+```{r, eval = F}
+FindMarkersBulk(seurat = CD4, clus_ident = 'annotation_fine', sample_ident = 'sample_id', out_dir = 'dea_results_CD4/FindMarkersBulk_outs_CD4_annotated_ADT', assay = 'ADT')
+FindMarkersBulk(seurat = CD4, clus_ident = 'annotation_fine', sample_ident = 'sample_id', out_dir = 'dea_results_CD4/FindMarkersBulk_outs_CD4_annotated_RNA', assay = 'RNA')
+```
+
+# FindAllmarkers for individual samples
+```{r}
+Idents(CD4) <- 'sample_id'
+CD4_sub <- subset(CD4, idents = 'CTLA4-4h')
+Idents(CD4_sub) <- 'annotation_fine'
+markers <- FindAllMarkers(CD4_sub, assay = 'RNA', slot = 'data')
+for(i in unique(markers$cluster)){
+  marker_sub <- markers[which(markers$cluster == i),]
+  write.csv(marker_sub, file = paste('dea_results_CD4/FindAllMarkers/CTLA4_4h/',i,'.csv', sep = ''))
+}
+
+CD4_sub <- subset(CD4, idents = 'CTLA4-24h')
+Idents(CD4_sub) <- 'annotation_fine'
+markers <- FindAllMarkers(CD4_sub, assay = 'RNA', slot = 'data')
+for(i in unique(markers$cluster)){
+  marker_sub <- markers[which(markers$cluster == i),]
+  write.csv(marker_sub, file = paste('dea_results_CD4/FindAllMarkers/CTLA4_24h/',i,'.csv', sep = ''))
+}
+
+CD4_sub <- subset(CD4, idents = 'PD1-4h')
+Idents(CD4_sub) <- 'annotation_fine'
+markers <- FindAllMarkers(CD4_sub, assay = 'RNA', slot = 'data')
+for(i in unique(markers$cluster)){
+  marker_sub <- markers[which(markers$cluster == i),]
+  write.csv(marker_sub, file = paste('dea_results_CD4/FindAllMarkers/PD1_4h/',i,'.csv', sep = ''))
+}
+
+CD4_sub <- subset(CD4, idents = 'PD1-24h')
+Idents(CD4_sub) <- 'annotation_fine'
+markers <- FindAllMarkers(CD4_sub, assay = 'RNA', slot = 'data')
+for(i in unique(markers$cluster)){
+  marker_sub <- markers[which(markers$cluster == i),]
+  write.csv(marker_sub, file = paste('dea_results_CD4/FindAllMarkers/PD1_24h/',i,'.csv', sep = ''))
+}
+```

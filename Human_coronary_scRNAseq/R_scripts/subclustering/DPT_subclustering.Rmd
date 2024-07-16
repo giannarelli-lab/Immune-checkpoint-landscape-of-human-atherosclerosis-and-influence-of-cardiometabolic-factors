@@ -1,0 +1,29 @@
+---
+title: "DPT_sublustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+DPT <- readRDS('DPT.rds')
+DefaultAssay(DPT) <- "integrated"
+DPT <- ScaleData(DPT, assay = 'integrated')
+DPT <- RunPCA(DPT, verbose = FALSE, npcs = 30)
+DPT <- RunUMAP(DPT, dims = 1:30, verbose = TRUE)
+DPT <- FindNeighbors(DPT, verbose = TRUE, dims = 1:30)
+DPT <- FindClusters(DPT, verbose = TRUE, resolution = .75)
+saveRDS(DPT, file = 'DPT_clustered.rds')
+```
+
+```{r}
+FindMarkersBulk(DPT, clus_ident = 'seurat_clusters', sample_ident = 'Sample', out_dir = 'DPT_subcluster_markers')
+```
+

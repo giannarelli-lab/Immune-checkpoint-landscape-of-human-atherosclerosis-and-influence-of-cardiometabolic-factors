@@ -1,0 +1,174 @@
+---
+title: "Cluster and annotate protein data"
+author: "Michael Gildea"
+date: "7/21/2023"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(CVRCFunc)
+library(SeuratDisk)
+library(pheatmap)
+use_miniconda(condaenv = "/gpfs/data/fisherlab/conda_envs/scVelo")
+load('workspace_integrated_protein_alone.RData')
+```
+
+
+# Load whole datasaet object and cluster using integrated ADT
+```{r, eval = F}
+integrated_wnn <- readRDS(file = 'integrated_wnn.rds')
+DefaultAssay(integrated_wnn) <- 'integrated_ADT'
+```
+
+## umap
+```{r}
+Idents(integrated_wnn) <- 'seurat_clusters_ADT'
+DimPlot(integrated_wnn, reduction = 'umap.adt', label=T)
+DimPlot(integrated_wnn, reduction = 'umap.adt', split.by = 'orig.ident')
+Idents(integrated_wnn) <- 'orig.ident'
+DimPlot(integrated_wnn, reduction = 'umap.adt')
+```
+
+```{r, fig.height=8, fig.width=10}
+Idents(integrated_wnn) <- 'seurat_clusters_ADT'
+DimPlot(integrated_wnn, split.by = 'sample_id', ncol = 4, reduction = 'umap.adt')
+```
+
+## Cluster composition
+
+```{r}
+#order sample idents
+lev <- c('PD1-4h', 'PD1-24h', 'CTLA4-4h', 'CTLA4-24h', 'PBMC-1-4h', 'PBMC-1-24h')
+integrated_wnn$sample_id <- factor(integrated_wnn$sample_id, levels = lev)
+#order cluster idents
+```
+
+### Cluster level
+```{r}
+prop.clusters <- as.data.frame(prop.table(table(integrated_wnn$sample_id, integrated_wnn$seurat_clusters_ADT),margin = 1))
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+```
+```{r, fig.height=20, fig.width=6}
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))+
+  facet_grid(rows = vars(Var2))
+
+```
+
+## Some protein marker plots
+```{r}
+DefaultAssay(integrated_wnn) <- 'ADT'
+FeaturePlot(integrated_wnn, features = c("Hu.CD19"), max.cutoff = 2)
+FeaturePlot(integrated_wnn, features = c("Hu.CD4-RPA.T4"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD8"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD14-M5E2"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD11c"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD1c"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.KLRG1"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD16"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD56"), max.cutoff = 2, slot = 'data')
+
+key_features <- c("Hu.CD19", "Hu.CD4-RPA.T4", "Hu.CD8", "Hu.CD14-M5E2", "Hu.CD11c","Hu.CD1c", "Hu.CD16", "Hu.CD56")
+StackedVlnPlot(integrated_wnn, clus_ident = 'seurat_clusters_ADT', features = key_features, assay = 'ADT')
+```
+
+```{r, fig.height=18, fig.width=14}
+Idents(integrated_wnn) <- 'seurat_clusters_ADT'
+features <- row.names(integrated_wnn@assays$ADT)
+#StackedVlnPlot(integrated_wnn, features = features, clus_ident = 'seurat_clusters', assay = 'Antibody.capture')
+#DoHeatmap(integrated_wnn, features = features, assay = 'Antibody.capture')
+avg_exp <- AverageExpression(integrated_wnn, assays = 'ADT', features = features)
+avg_exp <- avg_exp$ADT
+pheatmap(avg_exp, scale = 'row', fontsize = 10, main = 'Average expression scaled by row')
+pheatmap(log10(avg_exp), fontsize = 10, main = 'log10(average expression)')
+```
+
+# B, NK, T, and myeloid sub clustering
+
+## Asign major cell types
+
+```{r, eval = F}
+Idents(integrated_wnn) <- 'seurat_clusters_ADT'
+T_cells <- c('4','7','8','9','11', '13', '15')
+B_cells <- c('2', '5', '6', '10', '14', '2', '12')
+Myeloid <- c('3')
+NK <- c('1', '16')
+annotation_major <- as.vector(integrated_wnn$seurat_clusters_ADT)
+annotation_major[which(annotation_major %in% T_cells)] <- 'T'
+annotation_major[which(annotation_major %in% B_cells)] <- 'B'
+annotation_major[which(annotation_major %in% Myeloid)] <- 'Myeloid'
+annotation_major[which(annotation_major %in% NK)] <- 'NK'
+integrated_wnn$annotation_major <- annotation_major
+saveRDS(integrated_wnn, file = 'integrated_wnn_majoranno.rds')
+```
+
+# ICI target expression
+## Proteins
+```{r, message=F, warning=F, fig.height=6, fig.width=6}
+Idents(integrated_wnn) <- 'annotation_major'
+ICI_prot <- c('Hu.CD279', 'Hu.TIGIT', 'Hu.CD152', 'Hu.CD223', 'Hu.CD272', 'HuMsRt.CD278')
+StackedVlnPlot(seurat = integrated_wnn, features = ICI_prot, assay = 'ADT', clus_ident = 'annotation_major')
+```
+
+## RNA
+```{r, fig.height=30, fig.width=4, message=F, warning=F}
+ICI_RNA <- read.csv('../../ICI_target_pairs_refined.csv')
+ICI_RNA <- unique(c(ICI_RNA$Receptors, ICI_RNA$Ligand))
+StackedVlnPlot(seurat = integrated_wnn, features = ICI_RNA, assay = 'RNA', clus_ident = 'annotation_major')
+```
+```{r, fig.height=6, fig.width=16, message=F, warning=F}
+DotPlot(integrated_wnn, features = ICI_RNA, assay = 'RNA', scale = T)+RotatedAxis()
+```
+
+# Add subclutering IDs
+```{r, fig.height=10, fig.width=14}
+B_anno <- read.csv(file = 'subclustering/WNN/B_annotations.csv')
+NK_anno <- read.csv(file = 'subclustering/WNN/NK_annotations.csv')
+Myeloid_anno <- read.csv(file = 'subclustering/WNN/Myeloid_annotations.csv')
+CD4_anno <- read.csv(file = 'subclustering/WNN/CD4_annotations.csv')
+CD8_anno <- read.csv(file = 'subclustering/WNN/CD8_annotations.csv')
+annotation_fine <- data.frame(annotation_fine = integrated_wnn$annotation_major, cell_ids = colnames(integrated_wnn))
+ind <- match(annotation_fine$cell_ids, B_anno$X)
+annotation_fine$annotation_fine[which(!is.na(ind))] <- B_anno$annotation_fine
+
+ind <- match(annotation_fine$cell_ids, NK_anno$X)
+annotation_fine$annotation_fine[which(!is.na(ind))] <- NK_anno$annotation_fine
+
+ind <- match(annotation_fine$cell_ids, Myeloid_anno$X)
+annotation_fine$annotation_fine[which(!is.na(ind))] <- Myeloid_anno$annotation_fine
+
+ind <- match(annotation_fine$cell_ids, CD4_anno$X)
+annotation_fine$annotation_fine[which(!is.na(ind))] <- CD4_anno$annotation_fine
+
+ind <- match(annotation_fine$cell_ids, CD8_anno$X)
+annotation_fine$annotation_fine[which(!is.na(ind))] <- CD8_anno$annotation_fine
+
+integrated_wnn$annotation_fine <- annotation_fine$annotation_fine
+Idents(integrated_wnn) <- 'annotation_fine'
+saveRDS(integrated_wnn, file = 'integrated_wnn_majoranno.rds')
+```
+
+## Daya's marker gene list all markers
+```{r, fig.width=16, fig.height=30, warning=F, message=F}
+daya_markers <- read.csv('../Daya_markers_02242023.csv')
+integrated_wnn <- NormalizeData(integrated_wnn, assay = 'RNA')
+integrated_wnn$annotation_fine <- factor(integrated_wnn$annotation_fine, levels = sort(unique(integrated_wnn$annotation_fine)))
+Idents(integrated_wnn) <- 'seurat_clusters_ADT'
+StackedVlnPlot(integrated_wnn, features = daya_markers$Gene[which(daya_markers$Cell_type == "MYELOID AND DC MARKERS")], slot = 'data', clus_ident = 'seurat_clusters_ADT')+NoLegend()
+StackedVlnPlot(integrated_wnn, features = daya_markers$Gene[which(daya_markers$Cell_type == "T_cells")], slot = 'data', clus_ident = 'seurat_clusters_ADT')+NoLegend()
+StackedVlnPlot(integrated_wnn, features = daya_markers$Gene[which(daya_markers$Cell_type == "HUMAN NK CELL")], slot = 'data', clus_ident = 'seurat_clusters_ADT')+NoLegend()
+```
+

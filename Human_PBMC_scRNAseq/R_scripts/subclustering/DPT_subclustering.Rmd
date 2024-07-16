@@ -1,0 +1,32 @@
+---
+title: "DPT_sublustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+DPT <- readRDS('../../DPT.rds')
+DefaultAssay(DPT) <- "integrated"
+DPT <- ScaleData(DPT, assay = 'integrated')
+DPT <- RunPCA(DPT, verbose = FALSE, npcs = 30)
+DPT <- RunUMAP(DPT, dims = 1:30, verbose = TRUE)
+DPT <- FindNeighbors(DPT, verbose = TRUE, dims = 1:30)
+DPT <- FindClusters(DPT, verbose = TRUE, resolution = .75)
+saveRDS(DPT, file = 'DPT_clustered.rds')
+```
+
+```{r, eval = F}
+#Export H5ad for celltypist
+SaveH5Seurat(DPT, filename = "DPT.h5Seurat")
+Convert("DPT.h5Seurat", dest = "DPT_RNA.h5ad", assay = 'RNA')
+Convert("DPT.h5Seurat", dest = "DPT_integrated.h5ad", assay = 'integrated')
+FindMarkersBulk(DPT, clus_ident = 'seurat_clusters', sample_ident = 'orig.ident')
+```

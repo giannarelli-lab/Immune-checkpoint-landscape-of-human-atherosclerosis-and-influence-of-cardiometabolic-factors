@@ -1,0 +1,316 @@
+---
+title: "CITEseq analysis"
+author: "Michael Gildea"
+date: "12/21/2022"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(ggbeeswarm)
+```
+
+#load data
+```{r, warning=F, message=F}
+#read in data matrices
+seurat.data <- Read10X(data.dir = '/gpfs/data/giannarellilab/Mike_G/Immune_checkpoint_inhibitors/PBMC_ICI_CITEseq/count-Plate1-4h/outs/filtered_feature_bc_matrix')
+#extract hashtag counts from ADT assay
+
+
+# we save the 3 tables (sequences, antibody proteins, hashtags) as a seurat object
+#extract hashtag counts from ADT assay
+hash_counts <- seurat.data$`Antibody Capture`[grep(row.names(seurat.data$`Antibody Capture`), pattern = 'CMO'),]
+#remove hashtag counts from ADT assay
+seurat.data$`Antibody Capture` <- seurat.data$`Antibody Capture`[-grep(row.names(seurat.data$`Antibody Capture`), pattern = 'CMO'),]
+#Add hashtag matrix to list
+seurat.data[["HTO"]] <- hash_counts
+
+seurat_4h <- CreateSeuratObject(counts = seurat.data$HTO, assay = "HTO")
+seurat_4h[["RNA"]] <- CreateAssayObject(counts = seurat.data$`Gene Expression`)
+seurat_4h[["Antibody capture"]] <- CreateAssayObject(counts = seurat.data$`Antibody Capture`)
+
+```
+
+# Sample demultiplexing
+## Hasthtag QC
+```{r, warning=F, message=F}
+# Normalize HTO data, here we use centered log-ratio (CLR) transformation
+seurat_4h <- NormalizeData(seurat_4h, assay = "HTO", normalization.method = "CLR")
+seurat_4h <- HTODemux(seurat_4h, assay = "HTO", positive.quantile = 0.99)
+table(seurat_4h$HTO_classification.global)
+table(seurat_4h$HTO_maxID)
+Idents(seurat_4h) <- "HTO_classification.global"
+VlnPlot(seurat_4h, features = "nCount_RNA", pt.size = 0.1, log = TRUE)
+HTOHeatmap(seurat_4h, assay = "HTO")
+```
+
+```{r, fig.height=12, fig.width=8, warning=F, message=F}
+Idents(seurat_4h) <- "HTO_maxID"
+RidgePlot(seurat_4h, assay = "HTO", features = rownames(seurat_4h[["HTO"]]), ncol = 2)
+```
+
+## Extract singlets
+```{r}
+Idents(seurat_4h) <- 'HTO_classification.global'
+singlet_4h <- subset(seurat_4h, idents = "Singlet")
+
+sample_id <- as.vector(singlet_4h$orig.ident)
+sample_id[which(singlet_4h$hash.ID == 'CMO309')] <- "CTLA4-4h" 
+sample_id[which(singlet_4h$hash.ID == 'CMO308')] <- "condition_1"
+sample_id[which(singlet_4h$hash.ID == 'CMO305')] <- "condition_2" 
+sample_id[which(singlet_4h$hash.ID == 'CMO302')] <- "PD1-4h"
+sample_id[which(singlet_4h$hash.ID == 'CMO303')] <- "condition_3"
+sample_id[which(singlet_4h$hash.ID == 'CMO306')] <- "condition_4"
+sample_id[which(singlet_4h$hash.ID == 'CMO307')] <- "condition_5"
+sample_id[which(singlet_4h$hash.ID == 'CMO310')] <- "condition_6"
+sample_id[which(singlet_4h$hash.ID == 'CMO301')] <- "condition_7" 
+sample_id[which(singlet_4h$hash.ID == 'CMO304')] <- "PBMC-1-4h" 
+ 
+singlet_4h$sample_id <- sample_id
+table(singlet_4h$hash.ID, singlet_4h$sample_id)
+```
+
+## Split data by sample
+```{r, warning = F, message = F}
+singlet_4h_list <- SplitObject(singlet_4h, split.by = 'hash.ID')
+```
+
+## Assign sample names
+```{r, warning = F, message = F}
+names(singlet_4h_list)
+names(singlet_4h_list)[1] <- 'CTLA4_4h'
+names(singlet_4h_list)[2] <- 'condition_1'
+names(singlet_4h_list)[3] <- 'condition_2'
+names(singlet_4h_list)[4] <- 'PD1_4h'
+names(singlet_4h_list)[5] <- 'condition_3'
+names(singlet_4h_list)[6] <- 'condition_4'
+names(singlet_4h_list)[7] <- 'condition_5'
+names(singlet_4h_list)[8] <- 'condition_6'
+names(singlet_4h_list)[9] <- 'condition_7'
+names(singlet_4h_list)[10] <- 'PBMC-1_4h'
+names(singlet_4h_list)
+```
+
+# Sample QC
+## Total
+```{r}
+singlet_4h[["percent.mt"]] <- PercentageFeatureSet(singlet_4h, pattern = "^MT-", assay = 'RNA')
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(nFeature_RNA), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(nCount_RNA), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(percent.mt), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+          
+```
+
+## CTLA4_4h
+```{r, warning = F, message = F}
+singlet_4h_list[[1]]
+singlet_4h_list[[1]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[1]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[1]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[1]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[1]]@meta.data$nCount_RNA), singlet_4h_list[[1]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[1]]@meta.data$nFeature_RNA), singlet_4h_list[[1]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[1]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[1]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_1
+```{r, warning = F, message = F}
+singlet_4h_list[[2]]
+singlet_4h_list[[2]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[2]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[2]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[2]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[2]]@meta.data$nCount_RNA), singlet_4h_list[[2]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[2]]@meta.data$nFeature_RNA), singlet_4h_list[[2]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[2]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[2]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_2
+```{r, warning = F, message = F}
+singlet_4h_list[[3]]
+singlet_4h_list[[3]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[3]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[3]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[3]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[3]]@meta.data$nCount_RNA), singlet_4h_list[[3]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[3]]@meta.data$nFeature_RNA), singlet_4h_list[[3]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[3]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[3]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## PD1_4h
+```{r, warning = F, message = F}
+singlet_4h_list[[4]]
+singlet_4h_list[[4]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[4]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[4]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[4]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[4]]@meta.data$nCount_RNA), singlet_4h_list[[4]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[4]]@meta.data$nFeature_RNA), singlet_4h_list[[4]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[4]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[4]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_3
+```{r, warning = F, message = F}
+singlet_4h_list[[5]]
+singlet_4h_list[[5]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[5]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[5]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[5]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[5]]@meta.data$nCount_RNA), singlet_4h_list[[5]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[5]]@meta.data$nFeature_RNA), singlet_4h_list[[5]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[5]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[5]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_4
+```{r, warning = F, message = F}
+singlet_4h_list[[6]]
+singlet_4h_list[[6]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[6]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[6]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[6]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[6]]@meta.data$nCount_RNA), singlet_4h_list[[6]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[6]]@meta.data$nFeature_RNA), singlet_4h_list[[6]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[6]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[6]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_5
+```{r, warning = F, message = F}
+singlet_4h_list[[7]]
+singlet_4h_list[[7]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[7]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[7]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[7]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[7]]@meta.data$nCount_RNA), singlet_4h_list[[7]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[7]]@meta.data$nFeature_RNA), singlet_4h_list[[7]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[7]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[7]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_6
+```{r, warning = F, message = F}
+singlet_4h_list[[8]]
+singlet_4h_list[[8]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[8]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[8]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[8]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[8]]@meta.data$nCount_RNA), singlet_4h_list[[8]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[8]]@meta.data$nFeature_RNA), singlet_4h_list[[8]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[8]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[8]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## condition_7
+```{r, warning = F, message = F}
+singlet_4h_list[[9]]
+singlet_4h_list[[9]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[9]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[9]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[9]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[9]]@meta.data$nCount_RNA), singlet_4h_list[[9]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[9]]@meta.data$nFeature_RNA), singlet_4h_list[[9]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[9]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[9]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+## PBMC-1_4h
+```{r, warning = F, message = F}
+singlet_4h_list[[10]]
+singlet_4h_list[[10]][["percent.mt"]] <- PercentageFeatureSet(singlet_4h_list[[10]], pattern = "^MT-", assay = 'RNA')
+VlnPlot(singlet_4h_list[[10]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, log = T, pt.size = .5)
+VlnPlot(singlet_4h_list[[10]], features = c("nFeature_Antibody.capture", "nCount_Antibody.capture"), ncol = 2, log = T, pt.size = .5, assay = 'Antibody.capture')
+qplot(log10(singlet_4h_list[[10]]@meta.data$nCount_RNA), singlet_4h_list[[10]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[10]]@meta.data$nFeature_RNA), singlet_4h_list[[10]]@meta.data$percent.mt)+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+qplot(log10(singlet_4h_list[[10]]@meta.data$nFeature_RNA), log10(singlet_4h_list[[10]]@meta.data$nCount_RNA))+
+  geom_point(color = 'steelblue')+
+  theme_classic()
+```
+
+# Filter
+
+```{r}
+singlet_4h <- subset(singlet_4h, subset = nFeature_RNA > 500 & percent.mt < 10)
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(nFeature_RNA), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(nCount_RNA), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+
+ggplot(singlet_4h@meta.data, aes(x = sample_id, y = log10(percent.mt), fill = sample_id))+
+  geom_violin()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+          
+```
+
+```{r, eval = F}
+saveRDS(singlet_4h, file = 'singlet_4h_filtered.rds')
+```

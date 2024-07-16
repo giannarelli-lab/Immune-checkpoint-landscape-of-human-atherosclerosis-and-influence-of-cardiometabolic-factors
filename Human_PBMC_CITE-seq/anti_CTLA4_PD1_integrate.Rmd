@@ -1,0 +1,265 @@
+---
+title: "CTLA_PD1_integrate"
+author: "Michael Gildea"
+date: "7/21/2023"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(CVRCFunc)
+library(SeuratDisk)
+library(kableExtra)
+library(scater)
+library(patchwork)
+library(viridis)
+library(dplyr)
+library(miloR)
+use_miniconda(condaenv = "/gpfs/data/fisherlab/conda_envs/scVelo")
+load('workspace_integrated.RData')
+integrated_RNA <- readRDS('integrated_RNA.rds')
+integrated_ADT <- readRDS('integrated_ADT.rds')
+```
+
+```{r, eval = F}
+seurat_24h <- readRDS(file = '../singlet_24h_filtered.rds')
+Idents(seurat_24h) <- 'sample_id'
+seurat_24h <- subset(seurat_24h, idents = c('PBMC-1-24h', 'CTLA4-24h', 'PD1-24h'))
+seurat_24h$orig.ident <- rep('24h', ncol(seurat_24h))
+seurat_24h_RNA <- seurat_24h
+seurat_24h_ADT <- seurat_24h
+seurat_24h_RNA[['Antibody.capture']] <- NULL
+seurat_24h_ADT[['RNA']] <- NULL
+
+
+seurat_4h <- readRDS(file = '../singlet_4h_filtered.rds')
+Idents(seurat_4h) <- 'sample_id'
+seurat_4h <- subset(seurat_4h, idents = c('PBMC-1-4h', 'CTLA4-4h', 'PD1-4h'))
+seurat_4h$orig.ident <- rep('4h', ncol(seurat_4h))
+seurat_4h_RNA <- seurat_4h
+seurat_4h_ADT <- seurat_4h
+seurat_4h_RNA[['Antibody.capture']] <- NULL
+DefaultAssay(seurat_4h_ADT) <- 'Antibody.capture'
+seurat_4h_ADT[['RNA']] <- NULL
+seurat_4h_ADT[['SCT']] <- NULL
+```
+
+# Integrate RNA
+```{r, eval = F}
+seurat_24h_RNA <- SCTransform(seurat_24h_RNA, assay = 'RNA', vst.flavor = "v2", return.only.var.genes = F)
+seurat_4h_RNA <- SCTransform(seurat_4h_RNA, assay = 'RNA', vst.flavor = "v2", return.only.var.genes = F)
+seurat_RNA_list <- list(hour_4 = seurat_4h_RNA, hour_24 = seurat_24h_RNA)
+features <- SelectIntegrationFeatures(seurat_RNA_list, nfeatures = 3000)
+seurat_RNA_list <- PrepSCTIntegration(seurat_RNA_list, anchor.features = features)
+seurat_RNA_list <- lapply(X = seurat_RNA_list, FUN = function(x) {
+  x <- RunPCA(x, features = features, verbose = FALSE)
+})
+anchors  <- FindIntegrationAnchors(seurat_RNA_list, normalization.method = "SCT", anchor.features = features, dims = 1:30, reduction = "rpca")
+all_genes <- intersect(row.names(seurat_24h_RNA@assays$SCT), row.names(seurat_4h_RNA@assays$SCT))
+integrated_RNA <- IntegrateData(anchorset = anchors, normalization.method = "SCT",dims = 1:30, features.to.integrate = all_genes)
+
+integrated_RNA <- RunPCA(integrated_RNA, assay = 'integrated', features = features)
+integrated_RNA <- RunUMAP(integrated_RNA, dims = 1:30, verbose = TRUE, assay = 'integrated')
+integrated_RNA <- FindNeighbors(integrated_RNA, verbose = TRUE, dims = 1:30, assay = 'integrated')
+integrated_RNA <- FindClusters(integrated_RNA, verbose = TRUE, algorithm = 4, assay = 'integrated')
+saveRDS(integrated_RNA, file = 'integrated_RNA.rds')
+```
+
+## UMAP
+```{r}
+DimPlot(integrated_RNA, reduction = 'umap')
+DimPlot(integrated_RNA, reduction = 'umap', split.by = 'orig.ident')
+Idents(integrated_RNA) <- 'orig.ident'
+DimPlot(integrated_RNA, reduction = 'umap')
+```
+```{r, fig.height=10, fig.width=12}
+Idents(integrated_RNA) <- 'seurat_clusters'
+DimPlot(integrated_RNA, split.by = 'sample_id', ncol = 4, reduction = 'umap')
+```
+
+## Cluster composition
+```{r}
+prop.clusters <- as.data.frame(prop.table(table(integrated_RNA$sample_id, integrated_RNA$seurat_clusters),margin = 1))
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+```
+
+```{r, fig.height=15, fig.width=6}
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))+
+  facet_grid(rows = vars(Var2))
+```
+
+## Some marker gene plots
+```{r}
+DefaultAssay(integrated_RNA) <- 'RNA'
+integrated_RNA <- NormalizeData(integrated_RNA, assay = 'RNA')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD3G')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD3D')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD8A')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD4')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'SELL')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD68')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD14')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'FCGR3A')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'FSCN1')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'ITGAX')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CCR7')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CD19')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'MS4A1')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'NCAM1')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'FCGR3A')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'GZMB')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'FOXP3')
+FeaturePlot(integrated_RNA, slot = 'data', features = 'CTLA4')
+StackedVlnPlot(integrated_RNA, features = c('FCGR3A', 'CD14'))
+FeaturePlot(integrated_RNA, slot = 'data', features = 'HSPA2')
+```
+
+# Integrate Protein
+```{r, eval = F}
+DefaultAssay(seurat_24h_ADT) <- 'Antibody.capture'
+DefaultAssay(seurat_4h_ADT) <- 'Antibody.capture'
+seurat_24h_ADT <- NormalizeData(seurat_24h_ADT, assay = 'Antibody.capture', normalization.method = 'CLR', margin = 2)
+seurat_24h_ADT <- ScaleData(seurat_24h_ADT, assay = 'Antibody.capture')
+seurat_4h_ADT <- NormalizeData(seurat_4h_ADT, assay = 'Antibody.capture', normalization.method = 'CLR', margin = 2)
+seurat_4h_ADT <- ScaleData(seurat_4h_ADT, assay = 'Antibody.capture')
+seurat_ADT_list <- list(hour_4 = seurat_4h_ADT, hour_24 = seurat_24h_ADT)
+features <- SelectIntegrationFeatures(seurat_ADT_list, nfeatures = 140,  assay = c('Antibody.capture','Antibody.capture'))
+seurat_ADT_list <- PrepSCTIntegration(seurat_ADT_list, anchor.features = features, assay = 'Antibody.capture')
+seurat_ADT_list <- lapply(X = seurat_ADT_list, FUN = function(x) {
+  x <- RunPCA(x, features = features, verbose = FALSE)
+})
+ElbowPlot(seurat_ADT_list[[1]])
+ElbowPlot(seurat_ADT_list[[2]])
+anchors  <- FindIntegrationAnchors(seurat_ADT_list, anchor.features = features, dims = 1:10, reduction = "rpca")
+integrated_ADT <- IntegrateData(anchorset = anchors, dims = 1:10)
+
+integrated_ADT <- ScaleData(integrated_ADT, assay = 'integrated')
+integrated_ADT <- RunPCA(integrated_ADT, assay = 'integrated')
+ElbowPlot(integrated_ADT, reduction = 'pca')
+integrated_ADT <- RunUMAP(integrated_ADT, dims = 1:10, verbose = TRUE, assay = 'integrated')
+integrated_ADT <- FindNeighbors(integrated_ADT, verbose = TRUE, dims = 1:10, assay = 'integrated')
+integrated_ADT <- FindClusters(integrated_ADT, verbose = TRUE, algorithm = 4, assay = 'integrated')
+saveRDS(integrated_ADT, file = 'integrated_ADT.rds')
+```
+
+## UMAP
+```{r}
+Idents(integrated_ADT) <- 'seurat_clusters'
+DimPlot(integrated_ADT, reduction = 'umap')
+DimPlot(integrated_ADT, reduction = 'umap', label = T)
+DimPlot(integrated_ADT, reduction = 'umap', split.by = 'orig.ident')
+Idents(integrated_ADT) <- 'orig.ident'
+DimPlot(integrated_ADT, reduction = 'umap')
+```
+```{r, fig.height=10, fig.width=12}
+Idents(integrated_ADT) <- 'seurat_clusters'
+DimPlot(integrated_ADT, split.by = 'sample_id', ncol = 2, reduction = 'umap')
+```
+
+## Cluster composition
+```{r}
+prop.clusters <- as.data.frame(prop.table(table(integrated_ADT$sample_id, integrated_ADT$seurat_clusters),margin = 1))
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+```
+```{r, fig.height=25, fig.width=6}
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))+
+  facet_grid(rows = vars(Var2))
+```
+
+## Some marker gene plots
+```{r}
+DefaultAssay(integrated_ADT) <- 'Antibody.capture'
+FeaturePlot(integrated_ADT, features = c("Hu.CD19"), max.cutoff = 2)
+FeaturePlot(integrated_ADT, features = c("Hu.CD4-RPA.T4"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_ADT, features = c("Hu.CD8"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_ADT, features = c("Hu.CD14-M5E2"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_ADT, features = c("Hu.CD11c"), max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_ADT, features = c("Hu.CD1c"), max.cutoff = 2, slot = 'data')
+```
+
+# Find multimodal neighbors and run WNN
+
+```{r, eval = F}
+integrated_RNA[["integrated_ADT"]] <- integrated_ADT[["integrated"]]
+integrated_RNA[["pca.adt"]] <- integrated_ADT[["pca"]]
+integrated_RNA[["umap.adt"]] <- integrated_ADT[["umap"]]
+
+integrated_wnn <- FindMultiModalNeighbors(integrated_RNA, reduction.list = list("pca", "pca.adt"),  dims.list = list(1:30, 1:10), modality.weight.name = "RNA.weight")
+integrated_wnn <- RunUMAP(integrated_wnn, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+integrated_wnn <- FindClusters(integrated_wnn, graph.name = "wsnn", algorithm = 4, verbose = FALSE)
+integrated_wnn[['ADT']] <- integrated_ADT[['Antibody.capture']]
+integrated_wnn$seurat_clusters_RNA <- integrated_wnn$seurat_clusters
+integrated_wnn$seurat_clusters_ADT <- integrated_ADT$seurat_clusters
+integrated_wnn$seurat_clusters_wnn <- integrated_wnn$wsnn_res.0.8
+integrated_wnn$wsnn_res.0.8 <- NULL
+integrated_wnn$integrated_snn_res.0.8 <- NULL
+integrated_wnn$seurat_clusters <- NULL
+integrated_wnn$SCT_snn_res.0.8 <- NULL
+save.image('workspace_integrated.RData')
+saveRDS(integrated_wnn, file = 'integrated_wnn.rds')
+```
+
+## Modality weights
+```{r}
+Idents(integrated_wnn) <- 'seurat_clusters_wnn'
+VlnPlot(integrated_wnn, features = "integrated.weight", sort = TRUE, pt.size = 0.1) + NoLegend()
+```
+
+## UMAP
+```{r}
+DimPlot(integrated_wnn, reduction = 'wnn.umap')
+DimPlot(integrated_wnn, reduction = 'wnn.umap', split.by = 'orig.ident')
+Idents(integrated_wnn) <- 'orig.ident'
+DimPlot(integrated_wnn, reduction = 'wnn.umap')
+```
+```{r, fig.height=10, fig.width=12}
+Idents(integrated_wnn) <- 'seurat_clusters_wnn'
+DimPlot(integrated_wnn, reduction = 'wnn.umap', split.by = 'sample_id', ncol = 4)
+```
+
+## Cluster composition
+```{r}
+prop.clusters <- as.data.frame(prop.table(table(integrated_wnn$sample_id, integrated_wnn$seurat_clusters_wnn),margin = 1))
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))
+```
+```{r, fig.height=25, fig.width=6}
+ggplot(prop.clusters, aes(x = Var1, y = Freq, fill = Var2))+
+  geom_bar(stat = 'identity',  color = 'black')+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 315, hjust = 0))+
+  facet_grid(rows = vars(Var2))
+```
+
+## Some marker gene plots
+```{r}
+DefaultAssay(integrated_wnn) <- 'ADT'
+FeaturePlot(integrated_wnn, features = c("Hu.CD19"), reduction = 'wnn.umap', max.cutoff = 2)
+FeaturePlot(integrated_wnn, features = c("Hu.CD4-RPA.T4"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD8"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD14-M5E2"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD11c"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+FeaturePlot(integrated_wnn, features = c("Hu.CD1c"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+DefaultAssay(integrated_wnn) <- 'RNA'
+FeaturePlot(integrated_wnn, features = c("FSCN1"), reduction = 'wnn.umap', max.cutoff = 2, slot = 'data')
+```

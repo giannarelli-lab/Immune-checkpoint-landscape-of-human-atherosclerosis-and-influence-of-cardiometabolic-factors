@@ -1,0 +1,32 @@
+---
+title: "NK_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+NK <- readRDS('../../NK.rds')
+DefaultAssay(NK) <- "integrated"
+NK <- ScaleData(NK, assay = 'integrated')
+NK <- RunPCA(NK, verbose = FALSE, npcs = 30)
+NK <- RunUMAP(NK, dims = 1:30, verbose = TRUE)
+NK <- FindNeighbors(NK, verbose = TRUE, dims = 1:30)
+NK <- FindClusters(NK, verbose = TRUE, resolution = .75)
+saveRDS(NK, file = 'NK_clustered.rds')
+```
+
+```{r, eval = F}
+#Export H5ad for celltypist
+SaveH5Seurat(NK, filename = "NK.h5Seurat")
+Convert("NK.h5Seurat", dest = "NK_RNA.h5ad", assay = 'RNA')
+Convert("NK.h5Seurat", dest = "NK_integrated.h5ad", assay = 'integrated')
+FindMarkersBulk(NK, clus_ident = 'seurat_clusters', sample_ident = 'orig.ident')
+```

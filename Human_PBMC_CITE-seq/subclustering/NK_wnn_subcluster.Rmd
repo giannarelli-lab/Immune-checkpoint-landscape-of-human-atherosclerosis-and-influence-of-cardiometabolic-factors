@@ -1,0 +1,63 @@
+---
+title: "NK_wnn_subclustering"
+author: "Michael Gildea"
+date: "7/21/2023"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r, message=F, warning=F}
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(CVRCFunc)
+library(SeuratDisk)
+library(pheatmap)
+use_miniconda(condaenv = "/gpfs/data/fisherlab/conda_envs/scVelo")
+```
+
+# Extract NK
+```{r, eval = F}
+integrated_wnn <- readRDS(file = '/gpfs/data/giannarellilab/Mike_G/Immune_checkpoint_inhibitors/PBMC_ICI_CITEseq/CTLA4_PD1_treated/integrated_wnn_majoranno.rds')
+Idents(integrated_wnn) <- 'annotation_major'
+NK <- subset(integrated_wnn, idents = 'NK')
+```
+
+# load workspace
+```{r}
+load('NK_workspace.RData')
+```
+
+# Sub cluster using RNA and protein data with WNN
+```{r, eval = F}
+Idents(NK) <- 'orig.ident'
+NK_4h <- subset(NK, idents = '4h')
+NK_4h <- SCTransform(NK_4h,  vst.flavor = "v2", return.only.var.genes = F)
+NK_24h <- subset(NK, idents = '24h')
+NK_24h <- SCTransform(NK_24h,  vst.flavor = "v2", return.only.var.genes = F)
+NK_list <- list(hour_4 = NK_4h, hour_24 = NK_24h)
+features <- SelectIntegrationFeatures(object.list = NK_list, nfeatures = 3000)
+rm(NK_24h, NK_4h, NK_list)
+NK <- RunPCA(NK, features = features, assay = 'integrated', reduction.name = 'pca')
+ElbowPlot(NK, reduction = 'pca')
+NK <- FindMultiModalNeighbors(NK, reduction.list = list("pca", "pca.adt"),  dims.list = list(1:15, 1:10), modality.weight.name = "RNA.weight")
+NK <- RunUMAP(NK, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+NK <- FindClusters(NK, graph.name = "wsnn", algorithm = 4, verbose = FALSE, resolution = .5)
+NK <- NormalizeData(NK, assay = 'RNA')
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+DefaultAssay(NK) <- 'RNA'
+NK <- CellCycleScoring(NK, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+saveRDS(NK, file = 'NK.rds')
+save.image('NK_workspace.RData')
+```
+
+# Find cluster markers 
+```{r, eval = F}
+FindMarkersBulk(seurat = NK, clus_ident = 'annotation_fine', sample_ident = 'sample_id', out_dir = 'dea_results_NK/FindMarkersBulk_outs_NK_annotated_ADT', assay = 'ADT')
+FindMarkersBulk(seurat = NK, clus_ident = 'annotation_fine', sample_ident = 'sample_id', out_dir = 'dea_results_NK/FindMarkersBulk_outs_NK_annotated_RNA', assay = 'RNA')
+```

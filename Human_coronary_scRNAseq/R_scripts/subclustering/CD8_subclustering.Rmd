@@ -1,0 +1,28 @@
+---
+title: "CD8_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+CD8 <- readRDS('CD8.rds')
+DefaultAssay(CD8) <- "integrated"
+CD8 <- ScaleData(CD8, assay = 'integrated')
+CD8 <- RunPCA(CD8, verbose = FALSE, npcs = 30)
+CD8 <- RunUMAP(CD8, dims = 1:30, verbose = TRUE)
+CD8 <- FindNeighbors(CD8, verbose = TRUE, dims = 1:30)
+CD8 <- FindClusters(CD8, verbose = TRUE, resolution = .75)
+saveRDS(CD8, file = 'CD8_clustered.rds')
+```
+
+```{r, eval = F}
+FindMarkersBulk(CD8, clus_ident = 'seurat_clusters', sample_ident = 'Sample', out_dir = 'CD8_subcluster_markers')
+```

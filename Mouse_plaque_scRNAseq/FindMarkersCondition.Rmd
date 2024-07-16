@@ -1,0 +1,48 @@
+---
+title: "FindMarkersCondition"
+author: "Michael Gildea"
+date: "8/21/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(stringr)
+library(reshape2)
+```
+
+```{r}
+mouse <- readRDS('Whole_dataset_annotated_mouse_08152023_BLHP.rds')
+```
+
+```{r}
+#refined file curated by Gabriel 05232023
+ICI_targets <-read.csv('ICI_target_pairs_mouse_refined_081423.csv', header = T)
+ICI_targets_all <- unique(c(ICI_targets$Receptors, ICI_targets$Ligand))
+```
+
+## find markers wilcox all
+```{r}
+mouse <- NormalizeData(mouse, assay = 'RNA')
+DefaultAssay(mouse) <- 'RNA'
+Idents(mouse) <- 'annotation_fine'
+sig_up <- vector()
+sig_down <- vector()
+for(i in unique(mouse$annotation_fine)){
+  tr <- tryCatch(markers <- Seurat::FindMarkers(mouse, ident.1 = 'Halted Progression', ident.2 ='Baseline', group.by = 'Athero', subset.ident = i, assay = 'RNA', slot = 'data'),
+  error = function(e) e) 
+  if(inherits(tr, "error")){
+    markers <- data.frame(row.names = ICI_targets_all, 
+                          p_val = rep(1, length(ICI_targets_all)),
+                          avg_log2FC = rep(0, length(ICI_targets_all)),
+                          pct.1 = rep(0, length(ICI_targets_all)),
+                          pct.2 = rep(1, length(ICI_targets_all)),
+                          p_val_adj = rep(1, length(ICI_targets_all)))
+  }
+  write.csv(markers, file = paste('annotation_fine_wilcox_athero/',i,'.csv',sep = ''), quote = F)
+  sig_up <- c(sig_up, length(which(markers$p_val_adj < 0.1 & markers$avg_log2FC > 0)))
+  sig_down <- c(sig_down, length(which(markers$p_val_adj < 0.1 & markers$avg_log2FC < 0)))
+}
+summary_results <- data.frame(cluster = unique(mouse$annotation_fine), sig_up = sig_up, sig_down = sig_down, sig_all = sig_up+sig_down)
+write.csv(file = paste('annotation_fine_wilcox_athero/summary_results.csv'), summary_results, quote = F, row.names = F)
+```

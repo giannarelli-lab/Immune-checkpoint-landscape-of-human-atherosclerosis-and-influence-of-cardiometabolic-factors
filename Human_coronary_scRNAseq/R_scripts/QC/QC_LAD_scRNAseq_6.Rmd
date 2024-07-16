@@ -1,0 +1,187 @@
+---
+title: "LAD_scRNAseq_6"
+author: "Michael Gildea"
+date: "2024-03-01"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    theme: spacelab
+---
+
+
+```{r}
+library(viridis)
+library(Seurat)
+library(ggplot2)
+library(CVRCFunc)
+library(scDblFinder)
+library(reshape2)
+library(presto)
+library(pheatmap)
+library(dplyr)
+```
+
+
+# Read in data and plot QC metrics
+```{r}
+LAD_scRNAseq_6 <- Read10X(data.dir = "Cellranger/LAD_scRNAseq_6/outs/filtered_feature_bc_matrix/")
+row.names(LAD_scRNAseq_6) <- gsub(x = row.names(LAD_scRNAseq_6), pattern = 'custom_ref_human_', replacement = '')
+LAD_scRNAseq_6 <- CreateSeuratObject(LAD_scRNAseq_6, min.cells = 0, min.features = 0)
+LAD_scRNAseq_6[["percent.mt"]] <- PercentageFeatureSet(LAD_scRNAseq_6, pattern = "^MT-")
+LAD_scRNAseq_6$Sample <- rep('LAD_scRNAseq_6', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Age <- rep('56', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Sex <- rep('M', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Pathology <- rep('FA', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Diabetes <- rep('No', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Hyperlipidemia <- rep('Yes', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$CKD <- rep('Yes', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$HCM <- rep('No', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Familial_DCM <- rep('No', ncol(LAD_scRNAseq_6))
+LAD_scRNAseq_6$Covid_status <- rep('Yes', ncol(LAD_scRNAseq_6))
+```
+
+## QC plots
+```{r}
+cols <- viridis(3)
+umi_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(nCount_RNA), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[1])+theme(legend.position = 'none')
+gene_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(nFeature_RNA), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[2])+theme(legend.position = 'none')
+mt_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(percent.mt), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[3])+theme(legend.position = 'none')
+umi_vio+gene_vio+mt_vio
+```
+
+
+```{r, fig.height=4, fig.width=16, message=F, warning=F}
+umi_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[1])+theme(legend.position = 'none')
+gene_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nFeature_RNA), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[2])+theme(legend.position = 'none')
+mt_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(percent.mt), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[3])+theme(legend.position = 'none')
+
+umi_hist+gene_hist+mt_hist
+```
+
+```{r, fig.height=4, fig.width=16, message=F, warning=F}
+count_gene <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), y = log10(nFeature_RNA), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[1])+theme(legend.position = 'none')
+count_mito <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), y = log10(percent.mt), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[2])+theme(legend.position = 'none')
+gene_mito <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nFeature_RNA), y = log10(percent.mt), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[3])+theme(legend.position = 'none')
+count_gene+count_mito+gene_mito
+```
+
+# Filter 
+```{r}
+LAD_scRNAseq_6 <- subset(LAD_scRNAseq_6, nCount_RNA > 1000 & percent.mt < 15 &  nFeature_RNA > 10^2.5)
+```
+
+## post filter QC plots
+### QC plots
+```{r}
+cols <- viridis(3)
+umi_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(nCount_RNA), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[1])+theme(legend.position = 'none')
+gene_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(nFeature_RNA), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[2])+theme(legend.position = 'none')
+mt_vio <- ggplot(LAD_scRNAseq_6@meta.data, aes(y = log10(percent.mt), x = orig.ident, fill = orig.ident))+
+  geom_violin()+theme_classic()+scale_fill_manual(values = cols[3])+theme(legend.position = 'none')
+umi_vio+gene_vio+mt_vio
+```
+
+
+```{r, fig.height=4, fig.width=16, message=F, warning=F}
+umi_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[1])+theme(legend.position = 'none')
+gene_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nFeature_RNA), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[2])+theme(legend.position = 'none')
+mt_hist <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(percent.mt), fill = orig.ident))+
+  geom_histogram()+theme_classic()+scale_fill_manual(values = cols[3])+theme(legend.position = 'none')
+
+umi_hist+gene_hist+mt_hist
+```
+
+```{r, fig.height=4, fig.width=16, message=F, warning=F}
+count_gene <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), y = log10(nFeature_RNA), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[1])+theme(legend.position = 'none')
+count_mito <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nCount_RNA), y = log10(percent.mt), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[2])+theme(legend.position = 'none')
+gene_mito <- ggplot(LAD_scRNAseq_6@meta.data, aes(x = log10(nFeature_RNA), y = log10(percent.mt), color = orig.ident))+
+  geom_point()+theme_classic()+scale_color_manual(values = cols[3])+theme(legend.position = 'none')
+count_gene+count_mito+gene_mito
+```
+
+# Dimensionality reduction & clustering
+```{r, fig.height=8, fig.width=10}
+LAD_scRNAseq_6 <- NormalizeData(LAD_scRNAseq_6, assay = 'RNA')
+LAD_scRNAseq_6 <- FindVariableFeatures(LAD_scRNAseq_6, assay = 'RNA')
+LAD_scRNAseq_6 <- ScaleData(LAD_scRNAseq_6, assay = 'RNA')
+LAD_scRNAseq_6 <- RunPCA(LAD_scRNAseq_6, assay = 'RNA')
+LAD_scRNAseq_6 <- FindNeighbors(LAD_scRNAseq_6, assay = 'RNA')
+LAD_scRNAseq_6 <- FindClusters(LAD_scRNAseq_6)
+LAD_scRNAseq_6 <- RunUMAP(LAD_scRNAseq_6, dims = c(1:30), reduction = 'pca')
+
+top10 <- head(VariableFeatures(LAD_scRNAseq_6), 30)
+plot1 <- VariableFeaturePlot(LAD_scRNAseq_6)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot2
+
+DimPlot(LAD_scRNAseq_6, label = T)
+LAD_scRNAseq_6$nCount_RNA_log <- log10(LAD_scRNAseq_6$nCount_RNA)
+FeaturePlot(LAD_scRNAseq_6, features = 'nCount_RNA_log')
+LAD_scRNAseq_6$nFeature_RNA_log <- log10(LAD_scRNAseq_6$nFeature_RNA)
+FeaturePlot(LAD_scRNAseq_6, features = 'nFeature_RNA_log')
+StackedVlnPlot(LAD_scRNAseq_6, features = c('nCount_RNA_log', 'nFeature_RNA_log', 'percent.mt'))
+StackedVlnPlot(LAD_scRNAseq_6, features = c('PTPRC', 'CD3E','CD8A','CD4','MKI67','CD68','CD14','CD19','TREM2','SELL','FOXP3','FSCN1', 'HBB'))
+FeaturePlot(LAD_scRNAseq_6, features = 'PTPRC')
+FeaturePlot(LAD_scRNAseq_6, features = 'CD3E')
+FeaturePlot(LAD_scRNAseq_6, features = 'CD68')
+FeaturePlot(LAD_scRNAseq_6, features = 'CD19')
+FeaturePlot(LAD_scRNAseq_6, features = 'CD34')
+FeaturePlot(LAD_scRNAseq_6, features = 'VCAN')
+FeaturePlot(LAD_scRNAseq_6, features = 'DCN')
+```
+
+# Top marker heatmap
+```{r, fig.height=18, fig.width=8, message=F, warning=F}
+markers <- wilcoxauc(LAD_scRNAseq_6, only.pos = TRUE, assay = 'data', seurat_assay = 'RNA', group_by = 'seurat_clusters')
+markers %>%group_by(group) %>% dplyr::filter(logFC > 1 & padj < 0.05)
+markers %>%group_by(group) %>%dplyr::filter(logFC > 1 & padj < 0.05) %>%slice_head(n = 20) %>%ungroup() -> top20
+avg_exp <- AverageExpression(LAD_scRNAseq_6, features = top20$feature, assay = 'RNA', slot = 'data')
+paletteLength <- 50
+myColor <- colorRampPalette(c("blue", "white", "red"))(paletteLength)
+myBreaks <- c(seq(-3, 0, length.out=ceiling(paletteLength/2) + 1), 
+              seq(3/paletteLength, 3, length.out=floor(paletteLength/2)))
+pheatmap::pheatmap(avg_exp$RNA, scale = 'row', color = myColor, breaks =myBreaks, fontsize = 6)
+```
+
+# Find doublets
+Didn't remove
+```{r, eval = F}
+LAD_scRNAseq_6_sce <- as.SingleCellExperiment(LAD_scRNAseq_6)
+LAD_scRNAseq_6_sce <- scDblFinder(LAD_scRNAseq_6_sce, clusters = LAD_scRNAseq_6_sce$ident)
+LAD_scRNAseq_6$doublet_class <- LAD_scRNAseq_6_sce$scDblFinder.class
+LAD_scRNAseq_6$doublet_score <- LAD_scRNAseq_6_sce$scDblFinder.score
+saveRDS(LAD_scRNAseq_6, file = 'LAD_scRNAseq_6.rds')
+```
+
+```{r}
+LAD_scRNAseq_6 <- readRDS('LAD_scRNAseq_6.rds')
+print(table(LAD_scRNAseq_6$seurat_clusters, LAD_scRNAseq_6$doublet_class))
+Idents(LAD_scRNAseq_6) <- 'doublet_class'
+DimPlot(LAD_scRNAseq_6)+scale_color_manual(values = c('grey','red'))
+FeaturePlot(LAD_scRNAseq_6, features = 'doublet_score')
+Idents(LAD_scRNAseq_6) <- 'seurat_clusters'
+VlnPlot(LAD_scRNAseq_6, features = 'doublet_score')+NoLegend()
+prop.doublets <- melt(prop.table(table(LAD_scRNAseq_6$seurat_clusters, LAD_scRNAseq_6$doublet_class),margin = 1))
+ggplot(prop.doublets, aes(x = Var1, y = value, fill = Var2))+
+  geom_bar(stat = 'identity')+
+  theme_classic()+
+  xlab('Cluster number')+
+  ylab('fraction doublet class')
+```
+

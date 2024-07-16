@@ -1,0 +1,33 @@
+---
+title: "CD4_subcluster"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+CD4 <- readRDS('../../CD4_updated.rds')
+DefaultAssay(CD4) <- "integrated"
+CD4 <- ScaleData(CD4, assay = 'integrated')
+CD4 <- RunPCA(CD4, verbose = FALSE, npcs = 30)
+CD4 <- RunUMAP(CD4, dims = 1:30, verbose = TRUE)
+CD4 <- FindNeighbors(CD4, verbose = TRUE, dims = 1:30)
+CD4 <- FindClusters(CD4, verbose = TRUE, resolution = .75)
+saveRDS(CD4, file = 'CD4_clustered.rds')
+```
+
+```{r, eval = F}
+#Export H5ad for celltypist
+SaveH5Seurat(CD4, filename = "CD4.h5Seurat")
+Convert("CD4.h5Seurat", dest = "CD4_RNA.h5ad", assay = 'RNA')
+Convert("CD4.h5Seurat", dest = "CD4_integrated.h5ad", assay = 'integrated')
+FindMarkersBulk(CD4, clus_ident = 'seurat_clusters', sample_ident = 'orig.ident')
+```
+

@@ -1,0 +1,986 @@
+---
+title: "qc_each_sample"
+author: "Ravneet Kaur"
+date: "4/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+suppressMessages(require(Seurat))
+suppressMessages(require(ggplot2))
+suppressMessages(require(cowplot))
+suppressMessages(require(scater))
+suppressMessages(require(scran))
+suppressMessages(require(BiocParallel))
+suppressMessages(require(BiocNeighbors))
+library(magrittr)
+library(glue)
+library(Seurat)
+library(future)
+library(Matrix)
+library(tidyverse)
+library(data.table)
+library(cowplot)
+library(scales)
+library(pheatmap)
+library(RColorBrewer)
+library(ggsci)
+library(UpSetR)
+library(ggforce)
+library(data.table)
+```
+
+# load object list
+```{r}
+diabetic_Seurat <- readRDS(file = "/gpfs/data/giannarellilab/sc_analysis/Old_analysis/diabetic_Seurat_04202021.rds")
+```
+
+# input, CreateSeuratObject, filter, save
+## GSM7018579_Sample1
+```{r}
+diabetic_Seurat[[1]]
+head(diabetic_Seurat[[1]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[1]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[1]] <- subset(diabetic_Seurat[[1]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[1]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[1]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[1]])})
+```
+
+## GSM7018580_Sample2
+```{r}
+diabetic_Seurat[[2]]
+head(diabetic_Seurat[[2]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[2]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[2]] <- subset(diabetic_Seurat[[2]], subset = nFeature_RNA > 200 & nCount_RNA < 18000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[2]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[2]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[2]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[2]])})
+```
+
+
+## GSM7018581_Sample3
+```{r}
+diabetic_Seurat[[3]]
+head(diabetic_Seurat[[3]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[3]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[3]] <- subset(diabetic_Seurat[[3]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[3]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[3]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[3]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[3]])})
+```
+
+## GSM7018582_Sample3A
+```{r}
+diabetic_Seurat[[4]]
+head(diabetic_Seurat[[4]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[4]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[4]] <- subset(diabetic_Seurat[[4]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[4]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[4]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[4]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[4]])})
+```
+
+## GSM7018583_Sample4
+```{r}
+diabetic_Seurat[[5]]
+head(diabetic_Seurat[[5]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[5]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[5]] <- subset(diabetic_Seurat[[5]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[5]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[5]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[5]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[5]])})
+```
+
+## GSM7018584_Sample5
+```{r}
+diabetic_Seurat[[6]]
+head(diabetic_Seurat[[6]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[6]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[6]] <- subset(diabetic_Seurat[[6]], subset = nFeature_RNA > 200 & nCount_RNA < 10000 & percent.mt < 8)
+
+VlnPlot(object = diabetic_Seurat[[6]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[6]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[6]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[6]])})
+```
+
+## GSM7018585_Sample6
+```{r}
+diabetic_Seurat[[7]]
+head(diabetic_Seurat[[7]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[7]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[7]] <- subset(diabetic_Seurat[[7]], subset = nFeature_RNA > 600 & nCount_RNA < 18000 & percent.mt < 15)
+
+VlnPlot(object = diabetic_Seurat[[7]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[7]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[7]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[7]])})
+```
+
+## GSM7502472_Sample35
+```{r}
+diabetic_Seurat[[8]]
+head(diabetic_Seurat[[8]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[8]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[8]] <- subset(diabetic_Seurat[[8]], subset = nFeature_RNA > 200 & nCount_RNA < 12000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[8]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[8]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[8]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[8]])})
+```
+
+## GSM7502473_Sample36
+```{r}
+diabetic_Seurat[[9]]
+head(diabetic_Seurat[[9]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[9]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[9]] <- subset(diabetic_Seurat[[9]], subset = nFeature_RNA > 200 & nCount_RNA < 15000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[9]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[9]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[9]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[9]])})
+```
+
+## GSM7502474_Sample37
+```{r}
+diabetic_Seurat[[10]]
+head(diabetic_Seurat[[10]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[10]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[10]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[1]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[10]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+
+diabetic_Seurat[[10]] <- subset(diabetic_Seurat[[10]], subset = nFeature_RNA > 400 & nCount_RNA < 12000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[10]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[10]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[10]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[10]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[10]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[10]])})
+```
+
+## GSM8393425_CEA_scRNAseq_1
+```{r}
+diabetic_Seurat[[11]]
+head(diabetic_Seurat[[11]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[11]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[11]] <- subset(diabetic_Seurat[[11]], subset = nFeature_RNA > 200 & nCount_RNA < 18000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[11]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[11]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[11]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[11]])})
+```
+
+## GSM8393426_CEA_scRNAseq_2
+```{r}
+diabetic_Seurat[[12]]
+head(diabetic_Seurat[[12]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[12]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[12]] <- subset(diabetic_Seurat[[12]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[12]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[12]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[12]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[12]])})
+```
+
+## GSM8393427_CEA_scRNAseq_3
+```{r}
+diabetic_Seurat[[13]]
+head(diabetic_Seurat[[13]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[13]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[13]] <- subset(diabetic_Seurat[[13]], subset = nFeature_RNA > 200 & nCount_RNA < 15000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[13]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[13]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[13]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[13]])})
+```
+
+## GSM8393428_CEA_scRNAseq_4
+```{r}
+diabetic_Seurat[[14]]
+head(diabetic_Seurat[[14]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[14]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[14]] <- subset(diabetic_Seurat[[14]], subset = nFeature_RNA > 200 & nCount_RNA < 15000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[14]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[14]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[14]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[14]])})
+```
+
+
+## GSM8393429_CEA_scRNAseq_5
+```{r}
+diabetic_Seurat[[15]]
+head(diabetic_Seurat[[15]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[15]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[15]] <- subset(diabetic_Seurat[[15]], subset = nFeature_RNA > 200 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[15]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[15]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[15]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[15]])})
+```
+
+## GSM8393430_CEA_scRNAseq_6
+```{r}
+diabetic_Seurat[[16]]
+head(diabetic_Seurat[[16]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[16]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[16]] <- subset(diabetic_Seurat[[16]], subset = nFeature_RNA > 600 & nCount_RNA < 15000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[16]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[16]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[16]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[16]])})
+```
+
+## GSM8393431_CEA_scRNAseq_7
+```{r}
+diabetic_Seurat[[17]]
+head(diabetic_Seurat[[17]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[17]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[17]] <- subset(diabetic_Seurat[[17]], subset = nFeature_RNA > 700 & nCount_RNA < 10000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[17]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[17]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[17]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[17]])})
+```
+
+## GSM8393432_CEA_scRNAseq_8
+```{r}
+diabetic_Seurat[[18]]
+head(diabetic_Seurat[[18]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[18]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[18]] <- subset(diabetic_Seurat[[18]], subset = nFeature_RNA > 600 & nCount_RNA < 10000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[18]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[18]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[18]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[18]])})
+```
+
+## GSM8393433_CEA_scRNAseq_9
+```{r}
+diabetic_Seurat[[19]]
+head(diabetic_Seurat[[19]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[19]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[19]] <- subset(diabetic_Seurat[[19]], subset = nFeature_RNA > 400 & nCount_RNA < 20000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[19]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[19]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[19]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[19]])})
+```
+
+## GSM8393434_CEA_scRNAseq_10
+```{r}
+diabetic_Seurat[[20]]
+head(diabetic_Seurat[[20]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[20]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[20]] <- subset(diabetic_Seurat[[20]], subset = nFeature_RNA > 600 & nCount_RNA < 15000 & percent.mt < 15)
+
+VlnPlot(object = diabetic_Seurat[[20]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[20]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[20]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[20]])})
+```
+
+## GSM8393435_CEA_scRNAseq_11
+```{r}
+diabetic_Seurat[[21]]
+head(diabetic_Seurat[[21]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[21]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[21]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[21]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[21]] <- subset(diabetic_Seurat[[21]], subset = nFeature_RNA > 700 & nCount_RNA < 15000 & percent.mt < 15)
+
+VlnPlot(object = diabetic_Seurat[[21]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[21]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[21]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[21]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[21]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[21]])})
+```
+
+## GSM8393436_CEA_scRNAseq_12
+```{r}
+diabetic_Seurat[[22]]
+head(diabetic_Seurat[[22]]@meta.data)
+
+VlnPlot(object = diabetic_Seurat[[22]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+diabetic_Seurat[[22]] <- subset(diabetic_Seurat[[22]], subset = nFeature_RNA > 600 & nCount_RNA < 15000 & percent.mt < 10)
+
+VlnPlot(object = diabetic_Seurat[[22]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+cor_plot_umi_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+  scale_x_continuous(trans = 'log2')
+cor_plot_genes_mito <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nFeature_RNA", feature2 = "percent.mt",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+cor_plot_umi_genes <- 
+    FeatureScatter(object = diabetic_Seurat[[22]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident")+ theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))+
+   scale_x_continuous(
+    trans = "log2")
+print(plot_grid(cor_plot_umi_mito))
+print(plot_grid(cor_plot_genes_mito))
+print(plot_grid(cor_plot_umi_genes))
+
+message("Number of cells:", {ncol(diabetic_Seurat[[22]])})
+
+message("Number of genes:", {nrow(diabetic_Seurat[[22]])})
+```
+
+## save filtered data
+```{r}
+diabetic_Seurat_obj <- Reduce(function(x, y) merge(x, y, do.normalize = F), diabetic_Seurat)
+```
+
+## GSM7502475_Sample38
+```{r}
+#refer to citeseq.r script by Mike
+citeseq.plaque<-readRDS("/gpfs/data/giannarellilab/sc_analysis/QC/GSM7502475_Sample38_palque_subset.rds")
+```
+
+# merge all data with citeseq
+```{r}
+#MERGE all samples with citeseq sample
+final_obj <- merge(diabetic_Seurat_obj, y = citeseq.plaque)
+
+#split object by orig.ident
+final_obj_list <- SplitObject(final_obj, split.by = "orig.ident")
+
+save(final_obj_list, file ="/gpfs/data/giannarellilab/sc_analysis/QC/final_obj_list.rda")
+
+```
+
+

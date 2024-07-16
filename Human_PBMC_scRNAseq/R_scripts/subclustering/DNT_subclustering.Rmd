@@ -1,0 +1,32 @@
+---
+title: "DNT_subclustering"
+author: "Michael Gildea"
+date: "5/30/2023"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(CVRCFunc)
+library(SeuratDisk)
+```
+
+# Subcluster
+```{r, eval = F}
+DNT <- readRDS('../../DNT_updated.rds')
+DefaultAssay(DNT) <- "integrated"
+DNT <- ScaleData(DNT, assay = 'integrated')
+DNT <- RunPCA(DNT, verbose = FALSE, npcs = 30)
+DNT <- RunUMAP(DNT, dims = 1:30, verbose = TRUE)
+DNT <- FindNeighbors(DNT, verbose = TRUE, dims = 1:30)
+DNT <- FindClusters(DNT, verbose = TRUE, resolution = .75)
+saveRDS(DNT, file = 'DNT_clustered.rds')
+```
+
+```{r, eval = F}
+#Export H5ad for celltypist
+SaveH5Seurat(DNT, filename = "DNT.h5Seurat")
+Convert("DNT.h5Seurat", dest = "DNT_RNA.h5ad", assay = 'RNA')
+Convert("DNT.h5Seurat", dest = "DNT_integrated.h5ad", assay = 'integrated')
+FindMarkersBulk(DNT, clus_ident = 'seurat_clusters', sample_ident = 'orig.ident')
+```
