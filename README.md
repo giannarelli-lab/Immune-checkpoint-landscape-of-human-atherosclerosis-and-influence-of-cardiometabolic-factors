@@ -114,7 +114,7 @@ Raw data and processed count matrices for this study have been deposited in GEO 
 1.	[Create seurat object and filter](Human_coronary_scRNAseq/R_scripts/QC)
       Read in cellranger generated count matrices, filter low quality barcodes, detect and mark multiplets via [scDblFinder](https://bioconductor.org/packages/release/bioc/html/scDblFinder.html)
 2.	[Integrate](Human_coronary_scRNAseq/R_scripts/Pre_process_integrate.Rmd)
-      Remove multiplets, integrate, cluster, and identify marker genes per cluster. Annotate CD45- clusters and subcluster CD45+ cells.
+      Remove multiplets, integrate, cluster, and identify marker genes per cluster. Annotate CD45- clusters and subcluster CD45+ cells
 3.	[Subset major cell types](Human_coronary_scRNAseq/R_scripts/CD45+_analysis&subsetting.Rmd)
       Subset major cell types (myeloid, NK, B, T, CD4 T, CD8 T, DN T, DP T) from CD45+ cells
 4.  [Subcluster](Human_coronary_scRNAseq/R_scripts/subclustering)
