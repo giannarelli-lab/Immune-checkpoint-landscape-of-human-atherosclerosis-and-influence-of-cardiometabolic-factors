@@ -1,6 +1,7 @@
-# Decoding the immune checkpoint signatures in human atherosclerosis: implications of type 2 diabetes and lipid-lowering intervention
-DOI: add paper DOI
+# Immune checkpoint landscape of human atherosclerosis and influence of cardiometabolic factors
 
+Barcia Durán, J.G., Das, D., Gildea, M. et al. Immune checkpoint landscape of human atherosclerosis and influence of cardiometabolic factors. Nat Cardiovasc Res (2024).
+https://doi.org/10.1038/s44161-024-00563-4
 ***
 
 ## Human carotid plaque scRNA-seq analysis
